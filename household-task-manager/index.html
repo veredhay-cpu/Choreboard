@@ -137,9 +137,14 @@
 
       <!-- ADMIN DASHBOARD PANEL -->
       <section class="tab-content" id="admin-tab-content">
-        <div class="admin-actions-bar" style="margin-bottom: 20px; display: flex; justify-content: flex-end; gap: 10px;">
-          <button class="btn btn-primary" id="admin-share-invite-btn" style="background: var(--accent-emerald); border: 1px solid var(--accent-emerald); box-shadow: var(--shadow-glow); font-weight: bold; padding: 12px 24px; font-size: 1rem; cursor: pointer; display: none; align-items: center; gap: 8px;">🔗 שיתוף קישור הזמנה</button>
-          <button class="btn btn-primary" id="admin-add-task-btn" style="background: var(--accent-purple); border: 1px solid var(--accent-purple); box-shadow: var(--shadow-glow); font-weight: bold; padding: 12px 24px; font-size: 1rem; cursor: pointer; display: none; align-items: center; gap: 8px;">+ יצירת משימה חדשה</button>
+        <div class="admin-actions-bar" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div id="admin-family-code-display" style="font-size: 0.95rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: var(--border-radius-md); font-weight: 600;">
+            קוד משפחה לשיתוף: <span id="family-code-text" style="color: var(--accent-purple); font-family: monospace; font-size: 1.1rem; user-select: all; letter-spacing: 0.5px;">טוען...</span>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" id="admin-share-invite-btn" style="background: var(--accent-emerald); border: 1px solid var(--accent-emerald); box-shadow: var(--shadow-glow); font-weight: bold; padding: 12px 24px; font-size: 1rem; cursor: pointer; display: none; align-items: center; gap: 8px;">🔗 שיתוף קישור הזמנה</button>
+            <button class="btn btn-primary" id="admin-add-task-btn" style="background: var(--accent-purple); border: 1px solid var(--accent-purple); box-shadow: var(--shadow-glow); font-weight: bold; padding: 12px 24px; font-size: 1rem; cursor: pointer; display: none; align-items: center; gap: 8px;">+ יצירת משימה חדשה</button>
+          </div>
         </div>
         <div class="admin-grid">
           
@@ -590,6 +595,34 @@
 
         <button type="submit" class="btn btn-primary" style="width: 100%; font-size: 1rem; font-weight: 700; padding: 12px;">🚀 הצטרף למשפחה והתחל!</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Group Setup Overlay -->
+  <div class="user-picker-overlay" id="group-setup-overlay">
+    <div class="user-picker-modal glass-panel" style="max-width: 440px; padding: 32px 24px; text-align: center;">
+      <span style="font-size: 3.5rem; display: block; margin-bottom: 16px;">🏠</span>
+      <h2 style="font-size: 1.6rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px; text-align: center;">ברוכים הבאים ל-CleanHome!</h2>
+      <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.6; text-align: center; direction: rtl;">
+        מערכת משימות הבית המשפחתית שלך. כדי להתחיל, בחרו אחת מהאפשרויות:
+      </p>
+      
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <button class="btn btn-primary" id="btn-create-new-group" style="font-size: 1rem; font-weight: 700; padding: 14px; width: 100%; border-radius: var(--border-radius-md); box-shadow: var(--shadow-glow);">🏠 הקמת קבוצה משפחתית חדשה</button>
+        
+        <div style="margin: 8px 0; color: var(--text-muted); font-size: 0.85rem; position: relative; text-align: center;">
+          <span style="background: rgba(30, 41, 59, 0.95); padding: 0 10px; z-index: 1; position: relative;">או</span>
+          <hr style="border: 0; border-top: 1px solid var(--border-color); position: absolute; top: 50%; left: 0; right: 0; margin: 0; z-index: 0;" />
+        </div>
+        
+        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 16px; text-align: right; direction: rtl;">
+          <label for="input-group-code" style="font-size: 0.85rem; font-weight: bold; color: var(--text-primary); display: block; margin-bottom: 8px;">יש לכם קוד משפחה? הכניסו אותו כאן:</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="input-group-code" class="form-control" placeholder="family-abcde" style="flex: 1; padding: 8px; border-radius: var(--border-radius-sm); font-family: monospace;" />
+            <button class="btn btn-primary" id="btn-join-group-code" style="padding: 8px 16px; font-weight: bold; background: var(--accent-purple); border-radius: var(--border-radius-sm);">הצטרפות</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

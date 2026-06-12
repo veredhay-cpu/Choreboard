@@ -131,26 +131,37 @@ function errorCodeContains(msg, term) {
   return msg.toLowerCase().indexOf(term.toLowerCase()) !== -1;
 }
 
-// Function to seed initial data in Firestore if empty
-async function seedDatabaseIfEmpty() {
+// Function to seed initial data in Firestore if empty for the current group
+async function seedDatabaseIfEmpty(groupId) {
+  if (!groupId) return;
   try {
-    const usersSnap = await db.collection('users').get();
+    const usersSnap = await db.collection('users').where('groupId', '==', groupId).get();
     if (usersSnap.empty) {
-      console.log("Firestore database is empty. Seeding default data...");
+      console.log(`Firestore database is empty for group ${groupId}. Seeding default data...`);
       
       // Seed Users
       const userPromises = window.householdMockData.users.map(u => {
-        return db.collection('users').doc(u.id).set(u);
+        const uCopy = {
+          ...u,
+          id: `${groupId}-${u.id}`,
+          groupId: groupId
+        };
+        return db.collection('users').doc(uCopy.id).set(uCopy);
       });
       
       // Seed Tasks
       const taskPromises = window.householdMockData.tasks.map((t, idx) => {
         const taskData = {
           ...t,
+          id: `${groupId}-${t.id}`,
+          groupId: groupId,
           status: t.status === 'pending' ? 'new' : t.status,
           time: t.time || (idx === 1 ? '19:00' : idx === 3 ? '16:30' : '10:00'),
           order: idx
         };
+        if (t.assignee && t.assignee !== 'all') {
+          taskData.assignee = `${groupId}-${t.assignee}`;
+        }
         // Set tomorrow for car wash
         if (idx === 1) {
           const today = new Date();
@@ -158,16 +169,27 @@ async function seedDatabaseIfEmpty() {
           tomorrow.setDate(today.getDate() + 1);
           taskData.dueDate = formatDateString(tomorrow);
         }
-        return db.collection('tasks').doc(t.id).set(taskData);
+        return db.collection('tasks').doc(taskData.id).set(taskData);
       });
       
       // Seed History
       const historyPromises = window.householdMockData.history.map(h => {
-        return db.collection('history').doc(h.id).set(h);
+        const hCopy = {
+          ...h,
+          id: `${groupId}-${h.id}`,
+          groupId: groupId
+        };
+        if (hCopy.completedBy) {
+          hCopy.completedBy = `${groupId}-${hCopy.completedBy}`;
+        }
+        if (hCopy.taskId) {
+          hCopy.taskId = `${groupId}-${hCopy.taskId}`;
+        }
+        return db.collection('history').doc(hCopy.id).set(hCopy);
       });
       
       await Promise.all([...userPromises, ...taskPromises, ...historyPromises]);
-      console.log("Firestore database seeded successfully!");
+      console.log(`Firestore database seeded successfully for group ${groupId}!`);
     }
   } catch (error) {
     console.error("Firebase seeding error:", error);
@@ -177,6 +199,7 @@ async function seedDatabaseIfEmpty() {
 
 // State Object
 let state = {
+  groupId: null,
   users: [],
   tasks: [],
   history: [],
@@ -196,30 +219,73 @@ let triggeredReminderTimes = {};
 
 // Function to load local storage state or seed from mockData
 function loadLocalState() {
-  const users = localStorage.getItem('household_users');
-  const tasks = localStorage.getItem('household_tasks');
-  const history = localStorage.getItem('household_history');
+  const groupSuffix = state.groupId ? `_${state.groupId}` : '';
+  const users = localStorage.getItem(`household_users${groupSuffix}`);
+  const tasks = localStorage.getItem(`household_tasks${groupSuffix}`);
+  const history = localStorage.getItem(`household_history${groupSuffix}`);
   
   if (users) {
     state.users = JSON.parse(users);
   } else {
     state.users = JSON.parse(JSON.stringify(window.householdMockData.users));
-    localStorage.setItem('household_users', JSON.stringify(state.users));
+    if (state.groupId) {
+      state.users.forEach(u => {
+        u.groupId = state.groupId;
+        if (!u.id.startsWith(state.groupId + '-')) {
+          u.id = `${state.groupId}-${u.id}`;
+        }
+      });
+    }
+    localStorage.setItem(`household_users${groupSuffix}`, JSON.stringify(state.users));
   }
   
   if (tasks) {
     state.tasks = JSON.parse(tasks);
   } else {
     state.tasks = JSON.parse(JSON.stringify(window.householdMockData.tasks));
-    localStorage.setItem('household_tasks', JSON.stringify(state.tasks));
+    if (state.groupId) {
+      state.tasks.forEach(t => {
+        t.groupId = state.groupId;
+        if (!t.id.startsWith(state.groupId + '-')) {
+          t.id = `${state.groupId}-${t.id}`;
+        }
+        if (t.assignee && t.assignee !== 'all' && !t.assignee.startsWith(state.groupId + '-')) {
+          t.assignee = `${state.groupId}-${t.assignee}`;
+        }
+      });
+    }
+    localStorage.setItem(`household_tasks${groupSuffix}`, JSON.stringify(state.tasks));
   }
   
   if (history) {
     state.history = JSON.parse(history);
   } else {
     state.history = JSON.parse(JSON.stringify(window.householdMockData.history));
-    localStorage.setItem('household_history', JSON.stringify(state.history));
+    if (state.groupId) {
+      state.history.forEach(h => {
+        h.groupId = state.groupId;
+        if (!h.id.startsWith(state.groupId + '-')) {
+          h.id = `${state.groupId}-${h.id}`;
+        }
+        if (h.completedBy && !h.completedBy.startsWith(state.groupId + '-')) {
+          h.completedBy = `${state.groupId}-${h.completedBy}`;
+        }
+        if (h.taskId && !h.taskId.startsWith(state.groupId + '-')) {
+          h.taskId = `${state.groupId}-${h.taskId}`;
+        }
+      });
+    }
+    localStorage.setItem(`household_history${groupSuffix}`, JSON.stringify(state.history));
   }
+}
+
+// Function to save local fallback state
+function saveLocalFallbackState() {
+  if (firebaseLoaded) return;
+  const groupSuffix = state.groupId ? `_${state.groupId}` : '';
+  localStorage.setItem(`household_users${groupSuffix}`, JSON.stringify(state.users));
+  localStorage.setItem(`household_tasks${groupSuffix}`, JSON.stringify(state.tasks));
+  localStorage.setItem(`household_history${groupSuffix}`, JSON.stringify(state.history));
 }
 
 let isInitialLoad = true;
@@ -227,7 +293,9 @@ let firebaseLoaded = false;
 let firebaseFallbackTimer = null;
 
 function setupFirebaseListeners() {
-  db.collection('users').onSnapshot(snapshot => {
+  if (!state.groupId) return;
+
+  db.collection('users').where('groupId', '==', state.groupId).onSnapshot(snapshot => {
     const usersList = [];
     snapshot.forEach(doc => {
       usersList.push(doc.data());
@@ -246,7 +314,7 @@ function setupFirebaseListeners() {
     showFirebaseErrorAlert("קבלת משתמשים", error);
   });
 
-  db.collection('tasks').onSnapshot(snapshot => {
+  db.collection('tasks').where('groupId', '==', state.groupId).onSnapshot(snapshot => {
     const tasksList = [];
     snapshot.forEach(doc => {
       tasksList.push(doc.data());
@@ -260,7 +328,7 @@ function setupFirebaseListeners() {
     showFirebaseErrorAlert("קבלת משימות", error);
   });
 
-  db.collection('history').onSnapshot(snapshot => {
+  db.collection('history').where('groupId', '==', state.groupId).onSnapshot(snapshot => {
     const historyList = [];
     snapshot.forEach(doc => {
       historyList.push(doc.data());
@@ -277,6 +345,11 @@ function setupFirebaseListeners() {
 
 function onStateUpdated() {
   if (state.users.length === 0) return;
+
+  const elFamilyCodeText = document.getElementById('family-code-text');
+  if (elFamilyCodeText && state.groupId) {
+    elFamilyCodeText.textContent = state.groupId;
+  }
   
   if (isInitialLoad) {
     firebaseLoaded = true;
@@ -287,7 +360,8 @@ function onStateUpdated() {
     if (savedCurrentUser) {
       state.currentUser = state.users.find(u => u.id === savedCurrentUser) || state.users[0];
     } else {
-      state.currentUser = state.users.find(u => u.id === 'user-mom') || state.users[0];
+      const defaultMomId = state.groupId ? `${state.groupId}-user-mom` : 'user-mom';
+      state.currentUser = state.users.find(u => u.id === defaultMomId) || state.users[0];
     }
     
     let activeTab = localStorage.getItem('household_active_tab') || 'tasks';
@@ -382,6 +456,7 @@ async function initApp() {
   // Debug / Reset Query Param helpers
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('reset') || urlParams.has('first')) {
+    const currentGroupId = localStorage.getItem('household_group_id');
     localStorage.removeItem('household_visited');
     localStorage.removeItem('household_current_user');
     localStorage.removeItem('household_color_theme');
@@ -389,30 +464,50 @@ async function initApp() {
     localStorage.removeItem('household_users');
     localStorage.removeItem('household_tasks');
     localStorage.removeItem('household_history');
+    if (currentGroupId) {
+      localStorage.removeItem(`household_users_${currentGroupId}`);
+      localStorage.removeItem(`household_tasks_${currentGroupId}`);
+      localStorage.removeItem(`household_history_${currentGroupId}`);
+    }
+    localStorage.removeItem('household_group_id');
     
-    try {
-      const usersSnap = await db.collection('users').get();
-      const userDeletes = [];
-      usersSnap.forEach(doc => userDeletes.push(doc.ref.delete()));
-      
-      const tasksSnap = await db.collection('tasks').get();
-      const taskDeletes = [];
-      tasksSnap.forEach(doc => taskDeletes.push(doc.ref.delete()));
-      
-      const historySnap = await db.collection('history').get();
-      const historyDeletes = [];
-      historySnap.forEach(doc => historyDeletes.push(doc.ref.delete()));
-      
-      await Promise.all([...userDeletes, ...taskDeletes, ...historyDeletes]);
-    } catch (e) {
-      console.error("Failed to clear Firestore database during reset:", e);
-      showFirebaseErrorAlert("איפוס מסד נתונים", e);
+    if (currentGroupId) {
+      try {
+        const usersSnap = await db.collection('users').where('groupId', '==', currentGroupId).get();
+        const userDeletes = [];
+        usersSnap.forEach(doc => userDeletes.push(doc.ref.delete()));
+        
+        const tasksSnap = await db.collection('tasks').where('groupId', '==', currentGroupId).get();
+        const taskDeletes = [];
+        tasksSnap.forEach(doc => taskDeletes.push(doc.ref.delete()));
+        
+        const historySnap = await db.collection('history').where('groupId', '==', currentGroupId).get();
+        const historyDeletes = [];
+        historySnap.forEach(doc => historyDeletes.push(doc.ref.delete()));
+        
+        await Promise.all([...userDeletes, ...taskDeletes, ...historyDeletes]);
+      } catch (e) {
+        console.error("Failed to clear Firestore database during reset:", e);
+        showFirebaseErrorAlert("איפוס מסד נתונים", e);
+      }
     }
     
     // Clean URL query parameters and reload to start fresh
     window.location.href = window.location.pathname;
     return;
   }
+
+  // Check if group ID exists
+  let groupId = localStorage.getItem('household_group_id');
+  
+  // If groupId query parameter exists, prioritize it and save it
+  const groupParam = urlParams.get('group');
+  if (groupParam) {
+    localStorage.setItem('household_group_id', groupParam);
+    groupId = groupParam;
+  }
+
+  state.groupId = groupId;
 
   if (urlParams.has('join')) {
     // Show join overlay
@@ -423,6 +518,74 @@ async function initApp() {
       setupJoinFormHandlers();
     }
     return; // Stop app initialization
+  }
+
+  if (!groupId) {
+    // Show group setup overlay
+    const groupSetupOverlay = document.getElementById('group-setup-overlay');
+    if (groupSetupOverlay) {
+      groupSetupOverlay.classList.add('active');
+    }
+    
+    // Bind group setup buttons
+    const btnCreateNewGroup = document.getElementById('btn-create-new-group');
+    if (btnCreateNewGroup) {
+      btnCreateNewGroup.addEventListener('click', async () => {
+        // Generate a random group code, e.g., family-38492
+        const randomCode = `family-${Math.floor(10000 + Math.random() * 90000)}`;
+        localStorage.setItem('household_group_id', randomCode);
+        state.groupId = randomCode;
+        
+        // Seed database immediately for this group
+        try {
+          await seedDatabaseIfEmpty(randomCode);
+        } catch (e) {
+          console.error("Failed to seed new group:", e);
+        }
+        
+        // Set default current user to Mom (prefixed)
+        localStorage.setItem('household_current_user', `${randomCode}-user-mom`);
+        localStorage.setItem('household_visited', 'true');
+        
+        localStorage.setItem('household_pending_toast', JSON.stringify({
+          message: `הקבוצה ${randomCode} הוקמה בהצלחה! 🎉`,
+          type: 'success'
+        }));
+        
+        // Reload to start fresh under this group
+        window.location.reload();
+      });
+    }
+    
+    const btnJoinGroupCode = document.getElementById('btn-join-group-code');
+    const inputGroupCode = document.getElementById('input-group-code');
+    if (btnJoinGroupCode && inputGroupCode) {
+      btnJoinGroupCode.addEventListener('click', () => {
+        const enteredCode = inputGroupCode.value.trim();
+        if (!enteredCode) {
+          showToast('אנא הכנס קוד משפחה תקין', 'warning');
+          return;
+        }
+        
+        localStorage.setItem('household_group_id', enteredCode);
+        localStorage.setItem('household_visited', 'true');
+        
+        localStorage.setItem('household_pending_toast', JSON.stringify({
+          message: `הצטרפת לקבוצה ${enteredCode} בהצלחה! 🏠`,
+          type: 'success'
+        }));
+        
+        window.location.reload();
+      });
+    }
+    
+    return; // Stop app initialization until group is set
+  }
+
+  // Hide group setup overlay if it was open
+  const groupSetupOverlay = document.getElementById('group-setup-overlay');
+  if (groupSetupOverlay) {
+    groupSetupOverlay.classList.remove('active');
   }
 
   // Initialize Theme Selector
@@ -452,8 +615,8 @@ async function initApp() {
   }, 4000);
 
   try {
-    // Seed initial mock data in Firestore if empty
-    await seedDatabaseIfEmpty();
+    // Seed initial mock data in Firestore if empty for this group
+    await seedDatabaseIfEmpty(state.groupId);
 
     // Bind events (must run once)
     bindEvents();
@@ -473,6 +636,7 @@ function saveState() {
   if (state.currentUser) {
     localStorage.setItem('household_current_user', state.currentUser.id);
   }
+  saveLocalFallbackState();
 }
 
 // Helpers
@@ -618,9 +782,15 @@ function setupJoinFormHandlers() {
         return;
       }
       
-      const userId = 'user-' + Date.now();
+      const groupId = state.groupId || localStorage.getItem('household_group_id');
+      if (!groupId) {
+        showToast('שגיאה: חסר קוד משפחה בקישור ההזמנה', 'warning');
+        return;
+      }
+      const userId = `${groupId}-user-${Date.now()}`;
       const newUser = {
         id: userId,
+        groupId,
         name,
         role,
         avatar,
@@ -632,9 +802,10 @@ function setupJoinFormHandlers() {
       try {
         await db.collection('users').doc(userId).set(newUser);
         
-        const histId = 'hist-' + Date.now();
+        const histId = `${groupId}-hist-${Date.now()}`;
         await db.collection('history').doc(histId).set({
           id: histId,
+          groupId,
           title: `הצטרף/ה למשפחה! 🚀`,
           reward: 0,
           stars: 0,
@@ -912,7 +1083,7 @@ function bindEvents() {
   const elAdminShareInviteBtn = document.getElementById('admin-share-invite-btn');
   if (elAdminShareInviteBtn) {
     elAdminShareInviteBtn.addEventListener('click', () => {
-      const inviteLink = window.location.origin + window.location.pathname + '?join=true';
+      const inviteLink = window.location.origin + window.location.pathname + `?join=true&group=${state.groupId}`;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(inviteLink).then(() => {
           showToast('קישור ההזמנה הועתק! שלח אותו למשפחה בוואטסאפ 🚀', 'success');
@@ -1223,7 +1394,8 @@ function bindEvents() {
 
     // Add task to state
     const newTask = {
-      id: `task-${Date.now()}`,
+      id: `${state.groupId}-task-${Date.now()}`,
+      groupId: state.groupId,
       title,
       description,
       assignedTo,
@@ -1242,9 +1414,10 @@ function bindEvents() {
       order: state.tasks.length
     };
 
-    const historyId = `hist-${Date.now()}`;
+    const historyId = `${state.groupId}-hist-${Date.now()}`;
     const historyEntry = {
       id: historyId,
+      groupId: state.groupId,
       taskId: newTask.id,
       title: newTask.title,
       action: 'created',
@@ -1288,7 +1461,8 @@ function bindEvents() {
       if (!name) return;
 
       const newUser = {
-        id: `user-${Date.now()}`,
+        id: `${state.groupId}-user-${Date.now()}`,
+        groupId: state.groupId,
         name,
         role,
         avatar,
@@ -1335,6 +1509,7 @@ function bindEvents() {
       if (user) {
         const updatedUser = {
           ...user,
+          groupId: state.groupId,
           name,
           avatar,
           role,
@@ -1858,9 +2033,10 @@ window.triggerCompleteTask = async function(taskId) {
   }
 
   const todayStr = formatDateString(new Date());
-  const historyId = `hist-${Date.now()}`;
+  const historyId = `${state.groupId}-hist-${Date.now()}`;
   const historyEntry = {
     id: historyId,
+    groupId: state.groupId,
     taskId: task.id,
     title: task.title,
     action: 'completed',
@@ -2339,17 +2515,26 @@ async function triggerDeleteProfile(userId) {
   const confirmDelete = confirm(`האם אתה בטוח שברצונך למחוק את הפרופיל של ${user.name}? כל המשימות הפתוחות שהיו משויכות אליו יועברו ל-${fallbackName}.`);
   if (!confirmDelete) return;
 
-  // Reassign tasks locally
+  // Reassign tasks locally & on Firestore
+  const taskUpdatePromises = [];
   if (fallbackUser) {
     state.tasks.forEach(t => {
       if (t.assignedTo === userId) {
         t.assignedTo = fallbackUser.id;
+        taskUpdatePromises.push(db.collection('tasks').doc(t.id).set(t));
       }
     });
   }
 
   // Delete the user from state via mock db helper
   await db.collection('users').doc(userId).delete();
+  if (taskUpdatePromises.length > 0) {
+    try {
+      await Promise.all(taskUpdatePromises);
+    } catch (e) {
+      console.error("Failed to update reassigned tasks on Firestore:", e);
+    }
+  }
 
   // Save state (tasks change)
   saveState();
@@ -2375,6 +2560,12 @@ function payoutUser(userId) {
     // If we paid out the current user, sync the context
     if (state.currentUser.id === userId) {
       state.currentUser.balance = 0;
+    }
+
+    try {
+      db.collection('users').doc(user.id).set(user);
+    } catch (err) {
+      console.error("Firebase payout failed:", err);
     }
 
     saveState();
@@ -2647,9 +2838,10 @@ async function saveTaskEdit(e) {
       task.completedBy = state.currentUser.id;
       task.completedDate = todayStr;
 
-      const historyId = `hist-${Date.now()}`;
+      const historyId = `${state.groupId}-hist-${Date.now()}`;
       promises.push(db.collection('history').doc(historyId).set({
         id: historyId,
+        groupId: state.groupId,
         taskId: id,
         title: title,
         action: 'completed',
@@ -2713,11 +2905,12 @@ async function deleteTask(taskId) {
   const confirmDelete = confirm(`האם אתה בטוח שברצונך למחוק את המשימה "${task.title}"?`);
   if (!confirmDelete) return;
   
-  const historyId = `hist-${Date.now()}`;
+  const historyId = `${state.groupId}-hist-${Date.now()}`;
   try {
     await db.collection('tasks').doc(taskId).delete();
     await db.collection('history').doc(historyId).set({
       id: historyId,
+      groupId: state.groupId,
       taskId: taskId,
       title: task.title,
       action: 'deleted',
@@ -2778,6 +2971,7 @@ window.dropTaskOnCard = async function(event, targetTaskId) {
   // Update order properties based on new array indices
   const promises = state.tasks.map((t, idx) => {
     t.order = idx;
+    t.groupId = state.groupId;
     return db.collection('tasks').doc(t.id).set(t);
   });
   
