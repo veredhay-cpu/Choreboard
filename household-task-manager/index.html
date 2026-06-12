@@ -128,13 +128,13 @@
           <button class="filter-btn" data-filter="all">📂 המשימות של כולם</button>
           <button class="filter-btn" data-filter="completed">✔️ משימות שהושלמו</button>
           <button class="filter-btn" data-filter="paid">💰 משימות בתשלום</button>
-          
-          <div class="filter-dropdown-container" id="assignee-filter-container" style="margin-right: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-            <label for="task-assignee-filter" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; white-space: nowrap;">👤 סנן לפי בן משפחה:</label>
-            <select id="task-assignee-filter" class="form-control" style="padding: 6px 12px; font-size: 0.85rem; background: rgba(30, 41, 59, 0.8); height: auto; border-radius: var(--border-radius-md); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 160px;">
-              <!-- Populated in JS -->
-            </select>
-          </div>
+        </div>
+        
+        <div class="filter-dropdown-container" id="assignee-filter-container" style="display: none; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 12px; margin-bottom: 12px; padding: 4px 8px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: fit-content;">
+          <label for="task-assignee-filter" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; white-space: nowrap;">👤 סנן לפי בן משפחה:</label>
+          <select id="task-assignee-filter" class="form-control" style="padding: 6px 12px; font-size: 0.85rem; background: rgba(30, 41, 59, 0.8); height: auto; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 160px;">
+            <!-- Populated in JS -->
+          </select>
         </div>
         
         <div class="tasks-section-grid" id="tasks-grid">
@@ -154,7 +154,7 @@
 
   <!-- Family Settings Modal Overlay -->
   <div class="user-picker-overlay" id="family-settings-overlay">
-    <div class="user-picker-modal glass-panel" style="max-width: 600px; text-align: right; max-height: 90vh; overflow-y: auto; width: 90%;">
+    <div class="user-picker-modal glass-panel" style="max-width: 600px; text-align: right; width: 90%;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
         <h3 style="margin: 0; font-size: 1.25rem;">⚙️ ניהול והגדרות משפחה</h3>
         <button class="close-btn" id="family-settings-close-btn" style="line-height: 1;">&times;</button>
@@ -202,7 +202,7 @@
           </div>
 
           <!-- Add Profile Form -->
-          <div style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 16px;">
+          <div id="admin-add-profile-container" style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 16px;">
             <button type="button" id="toggle-add-profile-btn" class="btn btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; padding: 12px; font-size: 0.95rem; cursor: pointer; border: 1px dashed var(--border-color); background: rgba(255,255,255,0.02); transition: var(--transition-smooth);">
               ➕ הוספת בן משפחה חדש
             </button>
@@ -292,7 +292,7 @@
 
   <!-- Edit Task Modal Overlay -->
   <div class="user-picker-overlay" id="edit-task-overlay">
-    <div class="user-picker-modal glass-panel" style="max-width: 480px; text-align: right; max-height: 90vh; overflow-y: auto;">
+    <div class="user-picker-modal glass-panel" style="max-width: 480px; text-align: right;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
         <h3 style="margin: 0; font-size: 1.25rem;">✏️ עריכת משימה משפחתית</h3>
         <button class="close-btn" id="edit-task-close-btn" style="line-height: 1;">&times;</button>
@@ -419,7 +419,7 @@
 
   <!-- Create Task Modal Overlay -->
   <div class="user-picker-overlay" id="create-task-overlay">
-    <div class="user-picker-modal glass-panel" style="max-width: 480px; text-align: right; max-height: 90vh; overflow-y: auto;">
+    <div class="user-picker-modal glass-panel" style="max-width: 480px; text-align: right;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
         <h3 style="margin: 0; font-size: 1.25rem;">➕ יצירת משימה משפחתית חדשה</h3>
         <button class="close-btn" id="create-task-close-btn" style="line-height: 1;">&times;</button>
@@ -581,7 +581,7 @@
 
   <!-- Join Family Self-Registration Overlay -->
   <div class="user-picker-overlay" id="join-family-overlay">
-    <div class="user-picker-modal glass-panel" style="max-width: 440px; padding: 24px; text-align: right; max-height: 90vh; overflow-y: auto;">
+    <div class="user-picker-modal glass-panel" style="max-width: 440px; padding: 24px; text-align: right;">
       <h2 style="font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; text-align: center;">👋 הצטרפות לבית המשפחה</h2>
       <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5; text-align: center;">
         הוזמנת להצטרף לניהול משימות הבית המשפחתי ב-CleanHome! הגדר/י את הפרופיל שלך כדי להתחיל.

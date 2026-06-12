@@ -841,24 +841,7 @@ function initAvatarPicker(prefix) {
 
   gridEl.innerHTML = '';
   
-  // Render default emojis
-  cuteEmojis.forEach(emoji => {
-    const opt = document.createElement('div');
-    opt.className = 'avatar-option';
-    opt.textContent = emoji;
-    opt.dataset.value = emoji;
-    
-    opt.addEventListener('click', () => {
-      fileInputEl.value = '';
-      hiddenInputEl.value = emoji;
-      gridEl.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('active'));
-      opt.classList.add('active');
-    });
-    
-    gridEl.appendChild(opt);
-  });
-  
-  // Render custom photo upload button
+  // Render custom photo upload button first
   const uploadBtn = document.createElement('div');
   uploadBtn.className = 'avatar-option upload-btn';
   uploadBtn.innerHTML = '📷<br><span style="font-size:0.6rem; font-weight:bold;">העלאה</span>';
@@ -892,6 +875,23 @@ function initAvatarPicker(prefix) {
   });
   
   gridEl.appendChild(uploadBtn);
+  
+  // Render default emojis after
+  cuteEmojis.forEach(emoji => {
+    const opt = document.createElement('div');
+    opt.className = 'avatar-option';
+    opt.textContent = emoji;
+    opt.dataset.value = emoji;
+    
+    opt.addEventListener('click', () => {
+      fileInputEl.value = '';
+      hiddenInputEl.value = emoji;
+      gridEl.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('active'));
+      opt.classList.add('active');
+    });
+    
+    gridEl.appendChild(opt);
+  });
 }
 
 function initJoinAvatarPicker() {
@@ -1170,14 +1170,10 @@ function updateProfileUI() {
   // Highlight active user and update active balance indicator in dashboard
   elStatActiveBalance.textContent = `₪${state.currentUser.balance}`;
 
-  // Toggle Header Admin Gear Button for parents
+  // Toggle Header Admin Gear Button for all family members
   const elHeaderAdminGearBtn = document.getElementById('header-admin-gear-btn');
   if (elHeaderAdminGearBtn) {
-    if (state.currentUser.role === 'admin') {
-      elHeaderAdminGearBtn.style.display = 'flex';
-    } else {
-      elHeaderAdminGearBtn.style.display = 'none';
-    }
+    elHeaderAdminGearBtn.style.display = 'flex';
   }
 
   // Toggle Navigation Add Task button for all family members
@@ -1372,13 +1368,11 @@ function bindEvents() {
   if (elAdminShareInviteBtn) {
     elAdminShareInviteBtn.addEventListener('click', () => {
       const inviteLink = window.location.origin + window.location.pathname + `?join=true&group=${state.groupId}`;
+      const msg = `היי! אני מזמין אותך להצטרף לניהול משימות הבית המשפחתי ב-CleanHome. לחץ/י על הקישור הבא כדי להתחבר: ${inviteLink}`;
+      
+      // Try to copy link to clipboard first
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(inviteLink).then(() => {
-          showToast('קישור ההזמנה הועתק! שלח אותו למשפחה בוואטסאפ 🚀', 'success');
-        }).catch(err => {
-          console.error('Failed to copy link:', err);
-          showToast('שגיאה בהעתקת הקישור. הקישור הוא: ' + inviteLink, 'warning');
-        });
+        navigator.clipboard.writeText(inviteLink).catch(err => console.error('Failed to copy link:', err));
       } else {
         const tempInput = document.createElement('input');
         tempInput.value = inviteLink;
@@ -1386,12 +1380,17 @@ function bindEvents() {
         tempInput.select();
         try {
           document.execCommand('copy');
-          showToast('קישור ההזמנה הועתק! שלח אותו למשפחה בוואטסאפ 🚀', 'success');
         } catch (err) {
-          alert('אנא העתק את הקישור הבא: ' + inviteLink);
+          console.error('execCommand copy failed:', err);
         }
         document.body.removeChild(tempInput);
       }
+      
+      // Open WhatsApp with pre-filled message
+      const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+      window.open(whatsappUrl, '_blank');
+      
+      showToast('קישור ההזמנה הועתק ונפתח שיתוף בוואטסאפ! 🚀', 'success');
     });
   }
 
@@ -2112,13 +2111,13 @@ function renderTasks() {
   const activeFilterBtn = document.querySelector('.filter-btn.active');
   const filter = activeFilterBtn ? activeFilterBtn.getAttribute('data-filter') : 'my';
 
-  // Toggle assignee filter visibility: hide in "My Tasks"
+  // Toggle assignee filter visibility: only show in "Everyone's Tasks" (all)
   const elAssigneeFilterContainer = document.getElementById('assignee-filter-container');
   if (elAssigneeFilterContainer) {
-    if (filter === 'my') {
-      elAssigneeFilterContainer.style.display = 'none';
-    } else {
+    if (filter === 'all') {
       elAssigneeFilterContainer.style.display = 'flex';
+    } else {
+      elAssigneeFilterContainer.style.display = 'none';
     }
   }
 
@@ -2726,6 +2725,30 @@ function renderProfilesList() {
   if (!elAdminProfilesList) return;
   elAdminProfilesList.innerHTML = '';
 
+  const isAdmin = state.currentUser.role === 'admin';
+
+  // Toggle Add Profile Form block visibility
+  const elAddProfileContainer = document.getElementById('admin-add-profile-container');
+  if (elAddProfileContainer) {
+    elAddProfileContainer.style.display = isAdmin ? 'block' : 'none';
+  }
+
+  // Toggle Family Nickname controls
+  const elFamilyNicknameInput = document.getElementById('admin-family-nickname-input');
+  const elSaveNicknameBtn = document.getElementById('admin-save-nickname-btn');
+  if (elFamilyNicknameInput) {
+    elFamilyNicknameInput.disabled = !isAdmin;
+  }
+  if (elSaveNicknameBtn) {
+    elSaveNicknameBtn.style.display = isAdmin ? 'inline-block' : 'none';
+  }
+
+  // Toggle Share Invite button in the settings modal
+  const elAdminShareInviteBtn = document.getElementById('admin-share-invite-btn');
+  if (elAdminShareInviteBtn) {
+    elAdminShareInviteBtn.style.display = isAdmin ? 'flex' : 'none';
+  }
+
   state.users.forEach(user => {
     const item = document.createElement('div');
     item.className = 'admin-user-item';
@@ -2733,6 +2756,19 @@ function renderProfilesList() {
     
     const isSelf = user.id === state.currentUser.id;
     
+    // Determine action buttons based on user permissions
+    let actionsHTML = '';
+    if (isAdmin) {
+      actionsHTML = `
+        <button type="button" class="btn btn-secondary btn-edit-profile" style="padding: 6px 12px; font-size: 0.75rem;">✏️ ערוך</button>
+        <button type="button" class="btn btn-primary btn-delete-profile" style="padding: 6px 12px; font-size: 0.75rem; background: var(--accent-pink);" ${isSelf ? 'disabled title="אינך יכול למחוק את עצמך"' : ''}>🗑️ מחק</button>
+      `;
+    } else if (isSelf) {
+      actionsHTML = `
+        <button type="button" class="btn btn-secondary btn-edit-profile" style="padding: 6px 12px; font-size: 0.75rem;">✏️ ערוך</button>
+      `;
+    }
+
     item.innerHTML = `
       <div class="admin-user-details">
         <span style="font-size: 1.6rem; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); box-shadow: inset 0 0 10px ${user.color}30; overflow: hidden;">${getAvatarHTML(user.avatar)}</span>
@@ -2742,18 +2778,21 @@ function renderProfilesList() {
         </div>
       </div>
       <div style="display:flex; align-items:center; gap: 8px;">
-        <button type="button" class="btn btn-secondary btn-edit-profile" style="padding: 6px 12px; font-size: 0.75rem;">✏️ ערוך</button>
-        <button type="button" class="btn btn-primary btn-delete-profile" style="padding: 6px 12px; font-size: 0.75rem; background: var(--accent-pink);" ${isSelf ? 'disabled title="אינך יכול למחוק את עצמך"' : ''}>🗑️ מחק</button>
+        ${actionsHTML}
       </div>
     `;
     
-    // Add Event Listeners dynamically
-    item.querySelector('.btn-edit-profile').addEventListener('click', () => {
-      triggerEditProfile(user.id);
-    });
+    // Add Event Listeners dynamically if elements exist
+    const editBtn = item.querySelector('.btn-edit-profile');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        triggerEditProfile(user.id);
+      });
+    }
     
-    if (!isSelf) {
-      item.querySelector('.btn-delete-profile').addEventListener('click', () => {
+    const deleteBtn = item.querySelector('.btn-delete-profile');
+    if (deleteBtn && !isSelf) {
+      deleteBtn.addEventListener('click', () => {
         triggerDeleteProfile(user.id);
       });
     }
@@ -2770,7 +2809,14 @@ function triggerEditProfile(userId) {
   document.getElementById('admin-edit-profile-id').value = user.id;
   document.getElementById('admin-edit-profile-name').value = user.name;
   document.getElementById('admin-edit-profile-avatar').value = user.avatar;
-  document.getElementById('admin-edit-profile-role').value = user.role;
+  
+  const elRoleSelect = document.getElementById('admin-edit-profile-role');
+  if (elRoleSelect) {
+    elRoleSelect.value = user.role;
+    // Disable role field if the current logged-in user is not an admin
+    elRoleSelect.disabled = (state.currentUser.role !== 'admin');
+  }
+  
   document.getElementById('admin-edit-profile-color').value = user.color || '#8b5cf6';
   selectAvatarOption('admin-edit', user.avatar);
 
