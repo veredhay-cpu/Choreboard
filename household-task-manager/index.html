@@ -42,16 +42,25 @@
           </div>
           <div class="profile-switch-indicator" style="font-size: 0.9rem; color: var(--text-secondary); margin-right: 8px; margin-left: 2px; display: flex; align-items: center;">🔄</div>
         </div>
+        
+        <!-- Sleek Admin Settings Gear Button -->
+        <button class="switcher-btn" id="header-admin-gear-btn" title="ניהול והגדרות משפחה" style="display: none; padding: 0; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 50%; font-size: 1.25rem; cursor: pointer; align-items: center; justify-content: center; width: 44px; height: 44px; transition: var(--transition-smooth); flex-shrink: 0;">⚙️</button>
+        
         <button class="switcher-btn" id="enable-notifications-btn" style="background: var(--accent-emerald); display: none;">🔔 הפעל התראות</button>
       </div>
     </header>
 
+    <!-- Elongated Add Task Button Above Navigation Tabs -->
+    <div class="add-task-btn-container" style="display: flex; width: 100%; margin-bottom: 16px;">
+      <button class="btn btn-primary" id="nav-add-task-btn" style="display: none; width: 100%; align-items: center; justify-content: center; gap: 8px; font-weight: bold; padding: 14px; font-size: 1.1rem; border-radius: 50px; background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; box-shadow: var(--shadow-glow); cursor: pointer; transition: var(--transition-smooth); color: #fff;">
+        ➕ משימה חדשה לבית
+      </button>
+    </div>
+
     <!-- NAVIGATION TABS -->
     <nav class="nav-tabs">
-      <button class="nav-tab-action-btn" id="nav-add-task-btn" style="display: none;">+ משימה חדשה</button>
       <button class="nav-tab active" data-tab="tasks">📋 משימות לביצוע</button>
       <button class="nav-tab" data-tab="dashboard">📊 לוח בקרה</button>
-      <button class="nav-tab" data-tab="admin" id="nav-admin-tab" style="display: none;">⚙️ ניהול הורים</button>
     </nav>
 
     <!-- MAIN PANELS -->
@@ -135,89 +144,108 @@
 
       <!-- CALENDAR PANEL REMOVED -->
 
-      <!-- ADMIN DASHBOARD PANEL -->
-      <section class="tab-content" id="admin-tab-content">
-        <div class="admin-actions-bar" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
-          <div id="admin-family-code-display" style="font-size: 0.95rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: var(--border-radius-md); font-weight: 600;">
-            קוד משפחה לשיתוף: <span id="family-code-text" style="color: var(--accent-purple); font-family: monospace; font-size: 1.1rem; user-select: all; letter-spacing: 0.5px;">טוען...</span>
-          </div>
-          <div style="display: flex; gap: 10px;">
-            <button class="btn btn-primary" id="admin-share-invite-btn" style="background: var(--accent-emerald); border: 1px solid var(--accent-emerald); box-shadow: var(--shadow-glow); font-weight: bold; padding: 12px 24px; font-size: 1rem; cursor: pointer; display: none; align-items: center; gap: 8px;">🔗 שיתוף קישור הזמנה</button>
-            <button class="btn btn-primary" id="admin-add-task-btn" style="background: var(--accent-purple); border: 1px solid var(--accent-purple); box-shadow: var(--shadow-glow); font-weight: bold; padding: 12px 24px; font-size: 1rem; cursor: pointer; display: none; align-items: center; gap: 8px;">+ יצירת משימה חדשה</button>
-          </div>
-        </div>
-        <div class="admin-grid">
-          
-          <!-- Payout / Family list -->
-          <div class="admin-users-panel glass-panel">
-            <h3 class="panel-title" style="margin-bottom: 20px;">💵 תשלומי דמי כיס ויתרות</h3>
-            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">כאשר ילד משלים משימה בתשלום, כספו נצבר כאן. הורים מנהלים יכולים לבצע העברה פיזית של הכסף ולאפס את היתרה על ידי לחיצה על "בצע תשלום".</p>
-            <div class="admin-users-list" id="admin-users-list">
-              <!-- Dynamically populated -->
-            </div>
-          </div>
-
-          <!-- Profiles Management Card -->
-          <div class="admin-profiles-panel glass-panel" style="padding: 24px;">
-            <h3 class="panel-title" style="margin-bottom: 20px;">👥 ניהול בני משפחה ופרופילים</h3>
-            
-            <div style="display: flex; flex-direction: column; gap: 20px;">
-              
-              <!-- Profiles list -->
-              <div>
-                <h4 style="font-size: 1rem; color: var(--text-secondary); margin-bottom: 12px;">רשימת משתתפים פעילים</h4>
-                <div id="admin-profiles-list" style="display: flex; flex-direction: column; gap: 12px;">
-                  <!-- Populated in JS -->
-                </div>
-              </div>
-
-              <!-- Add Profile Form -->
-              <div style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 16px;">
-                <h4 style="font-size: 1rem; color: var(--text-secondary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">➕ הוספת בן משפחה חדש</h4>
-                <form id="admin-add-profile-form">
-                  
-                  <div class="form-group">
-                    <label for="admin-new-profile-name">שם פרטי</label>
-                    <input type="text" id="admin-new-profile-name" class="form-control" placeholder="שם הילד/ההורה" required>
-                  </div>
-
-                  <div class="form-group" style="margin-bottom: 16px;">
-                    <label>בחר תמונה לפרופיל או אייקון חמוד</label>
-                    <input type="hidden" id="admin-new-profile-avatar" value="👧">
-                    <input type="file" id="admin-new-profile-upload" accept="image/*" style="display: none;">
-                    <div class="avatar-options-grid" id="admin-new-avatar-options-grid">
-                      <!-- Populated in JS -->
-                    </div>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="admin-new-profile-role">תפקיד והרשאה</label>
-                    <select id="admin-new-profile-role" class="form-control">
-                      <option value="member">ילד / משתתף</option>
-                      <option value="admin">הורה (מנהל)</option>
-                    </select>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="admin-new-profile-color">צבע פרופיל (ללוח שנה)</label>
-                    <input type="color" id="admin-new-profile-color" class="form-control" value="#8b5cf6" style="padding: 4px; height: 42px; cursor: pointer;">
-                  </div>
-
-                  <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">➕ צור פרופיל משפחתי</button>
-                </form>
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-      </section>
+      <!-- ADMIN DASHBOARD PANEL REMOVED -->
 
     </main>
 
   </div>
 
   <!-- MODALS -->
+
+  <!-- Family Settings Modal Overlay -->
+  <div class="user-picker-overlay" id="family-settings-overlay">
+    <div class="user-picker-modal glass-panel" style="max-width: 600px; text-align: right; max-height: 90vh; overflow-y: auto; width: 90%;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+        <h3 style="margin: 0; font-size: 1.25rem;">⚙️ ניהול והגדרות משפחה</h3>
+        <button class="close-btn" id="family-settings-close-btn" style="line-height: 1;">&times;</button>
+      </div>
+
+      <!-- Onboarding Helper Card -->
+      <div id="admin-onboarding-banner" style="display: none; background: rgba(139, 92, 246, 0.1); border: 1px solid var(--accent-purple); border-radius: var(--border-radius-md); padding: 16px; margin-bottom: 20px; direction: rtl; text-align: right; position: relative;">
+        <button id="close-onboarding-banner-btn" style="position: absolute; left: 12px; top: 12px; background: none; border: none; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer; line-height: 1;">&times;</button>
+        <span style="font-size: 1.1rem; display: block; margin-bottom: 6px; font-weight: 800; color: var(--text-primary);">🎉 הקבוצה המשפחתית שלך מוכנה!</span>
+        <p style="font-size: 0.85rem; color: var(--text-primary); margin: 0 0 10px 0; line-height: 1.5;">
+          הקמת בהצלחה את קבוצת הבית שלכם. כעת נותרו רק שני צעדים פשוטים כדי להתחיל:
+        </p>
+        <ul style="margin: 0; padding-right: 16px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
+          <li><strong>עדכון שמות בני המשפחה:</strong> רדו למטה לכרטיס <em>"ניהול בני משפחה"</em>, לחצו על ✏️ <strong>ערוך</strong> ליד הפרופילים כדי לשנות את השמות (למשל אמא, אבא, שמות הילדים).</li>
+          <li><strong>שיתוף קוד הקבוצה:</strong> לחצו על כפתור 🔗 <strong>שיתוף קוד</strong> למעלה כדי לשלוח להם קישור הזמנה ישיר. הם יתחברו ויוכלו לרשום את עצמם מיידית!</li>
+        </ul>
+      </div>
+
+      <div class="admin-actions-bar" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <div id="admin-family-code-display" style="font-size: 0.95rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: var(--border-radius-md); font-weight: 600; flex-grow: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+            <span>קוד משפחה:</span>
+            <span id="family-code-text" style="color: var(--accent-purple); font-family: monospace; font-size: 1.1rem; user-select: all; letter-spacing: 0.5px;">טוען...</span>
+          </div>
+          <button class="btn btn-primary" id="admin-share-invite-btn" style="background: var(--accent-emerald); border: 1px solid var(--accent-emerald); font-weight: bold; padding: 8px 16px; font-size: 0.9rem; cursor: pointer; display: none; align-items: center; gap: 8px;">🔗 שיתוף קוד</button>
+        </div>
+        
+        <div id="admin-family-nickname-display" style="font-size: 0.95rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: var(--border-radius-md); font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-grow: 1;">
+            <span>כינוי המשפחה:</span>
+            <input type="text" id="admin-family-nickname-input" class="form-control" placeholder="המשפחה שלי" style="padding: 4px 8px; font-size: 0.9rem; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); width: 140px; height: auto;" />
+          </div>
+          <button class="btn btn-primary" id="admin-save-nickname-btn" style="padding: 6px 16px; font-size: 0.9rem; background: var(--accent-purple); border: none; border-radius: var(--border-radius-sm); cursor: pointer; font-weight: bold;">שמור 💾</button>
+        </div>
+      </div>
+
+      <!-- Profiles Management Section -->
+      <div class="admin-profiles-panel" style="padding: 0; margin-bottom: 20px;">
+        <h4 style="font-size: 1rem; color: var(--text-secondary); margin-bottom: 12px;">👥 ניהול בני משפחה ופרופילים</h4>
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+          <div>
+            <div id="admin-profiles-list" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Populated in JS -->
+            </div>
+          </div>
+
+          <!-- Add Profile Form -->
+          <div style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 16px;">
+            <button type="button" id="toggle-add-profile-btn" class="btn btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; padding: 12px; font-size: 0.95rem; cursor: pointer; border: 1px dashed var(--border-color); background: rgba(255,255,255,0.02); transition: var(--transition-smooth);">
+              ➕ הוספת בן משפחה חדש
+            </button>
+            <form id="admin-add-profile-form" style="display: none; margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+              <div class="form-group">
+                <label for="admin-new-profile-name">שם פרטי</label>
+                <input type="text" id="admin-new-profile-name" class="form-control" placeholder="שם הילד/ההורה" required>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label>בחר תמונה לפרופיל או אייקון חמוד</label>
+                <input type="hidden" id="admin-new-profile-avatar" value="👧">
+                <input type="file" id="admin-new-profile-upload" accept="image/*" style="display: none;">
+                <div class="avatar-options-grid" id="admin-new-avatar-options-grid">
+                  <!-- Populated in JS -->
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="admin-new-profile-role">תפקיד והרשאה</label>
+                <select id="admin-new-profile-role" class="form-control">
+                  <option value="member">ילד / משתתף</option>
+                  <option value="admin">הורה (מנהל)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="admin-new-profile-color">צבע פרופיל (ללוח שנה)</label>
+                <input type="color" id="admin-new-profile-color" class="form-control" value="#8b5cf6" style="padding: 4px; height: 42px; cursor: pointer;">
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">➕ הוסף בן משפחה</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Finish Button at the bottom of the modal -->
+      <button type="button" class="btn btn-primary" id="family-settings-finish-btn" style="width: 100%; margin-top: 12px; background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; font-weight: bold; padding: 12px; font-size: 1rem; cursor: pointer; box-shadow: var(--shadow-glow);">
+        ✔️ סיום ושמירה
+      </button>
+    </div>
+  </div>
 
   <!-- Edit Profile Modal Overlay -->
   <div class="user-picker-overlay" id="edit-profile-overlay">
@@ -600,27 +628,38 @@
 
   <!-- Group Setup Overlay -->
   <div class="user-picker-overlay" id="group-setup-overlay">
-    <div class="user-picker-modal glass-panel" style="max-width: 440px; padding: 32px 24px; text-align: center;">
-      <span style="font-size: 3.5rem; display: block; margin-bottom: 16px;">🏠</span>
-      <h2 style="font-size: 1.6rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px; text-align: center;">ברוכים הבאים ל-CleanHome!</h2>
-      <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.6; text-align: center; direction: rtl;">
-        מערכת משימות הבית המשפחתית שלך. כדי להתחיל, בחרו אחת מהאפשרויות:
+    <div class="user-picker-modal glass-panel" style="max-width: 720px; padding: 36px 28px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(15, 23, 42, 0.95); box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <span style="font-size: 3.5rem; display: block; margin-bottom: 12px; filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.3));">🏡</span>
+      <h2 style="font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; text-align: center;">ברוכים הבאים ל-CleanHome!</h2>
+      <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 32px; line-height: 1.6; text-align: center; direction: rtl; max-width: 500px; margin-left: auto; margin-right: auto;">
+        מערכת משימות הבית המשפחתית שלך. כדי להתחיל, בחרו באחת משתי האפשרויות הבאות:
       </p>
       
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <button class="btn btn-primary" id="btn-create-new-group" style="font-size: 1rem; font-weight: 700; padding: 14px; width: 100%; border-radius: var(--border-radius-md); box-shadow: var(--shadow-glow);">🏠 הקמת קבוצה משפחתית חדשה</button>
-        
-        <div style="margin: 8px 0; color: var(--text-muted); font-size: 0.85rem; position: relative; text-align: center;">
-          <span style="background: rgba(30, 41, 59, 0.95); padding: 0 10px; z-index: 1; position: relative;">או</span>
-          <hr style="border: 0; border-top: 1px solid var(--border-color); position: absolute; top: 50%; left: 0; right: 0; margin: 0; z-index: 0;" />
+      <div class="group-setup-columns" style="display: flex; gap: 24px; direction: rtl; text-align: right; flex-wrap: wrap;">
+        <!-- Option 1: Create New Group -->
+        <div style="flex: 1; min-width: 280px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 24px; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+          <div>
+            <span style="font-size: 2rem; display: block; margin-bottom: 12px;">🆕</span>
+            <h3 style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">אני רוצה להקים קבוצה חדשה</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px;">
+              יצירת קבוצה משפחתית חדשה לגמרי. בחרו כינוי למשפחה שלכם (למשל: משפחת כהן):
+            </p>
+            <input type="text" id="input-group-name" class="form-control" placeholder="למשל: משפחת כהן" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); font-size: 1rem; margin-bottom: 20px; border: 1px solid var(--border-color); background: rgba(15,23,42,0.6); color: var(--text-primary); text-align: center;" />
+          </div>
+          <button class="btn btn-primary" id="btn-create-new-group" style="font-size: 0.95rem; font-weight: 700; padding: 12px; width: 100%; border-radius: var(--border-radius-sm); box-shadow: var(--shadow-glow); background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; cursor: pointer;">🏠 הקמת קבוצה חדשה</button>
         </div>
         
-        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 16px; text-align: right; direction: rtl;">
-          <label for="input-group-code" style="font-size: 0.85rem; font-weight: bold; color: var(--text-primary); display: block; margin-bottom: 8px;">יש לכם קוד משפחה? הכניסו אותו כאן:</label>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" id="input-group-code" class="form-control" placeholder="family-abcde" style="flex: 1; padding: 8px; border-radius: var(--border-radius-sm); font-family: monospace;" />
-            <button class="btn btn-primary" id="btn-join-group-code" style="padding: 8px 16px; font-weight: bold; background: var(--accent-purple); border-radius: var(--border-radius-sm);">הצטרפות</button>
+        <!-- Option 2: Join Existing Group -->
+        <div style="flex: 1; min-width: 280px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); padding: 24px; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+          <div>
+            <span style="font-size: 2rem; display: block; margin-bottom: 12px;">🔑</span>
+            <h3 style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">יש לי כבר קוד משפחה</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px;">
+              אם אחד מבני המשפחה כבר הקים קבוצה ושלח לכם קוד משותף (למשל: `family-12345`), הכניסו אותו כאן כדי להתחבר ללוח המשפחתי:
+            </p>
+            <input type="text" id="input-group-code" class="form-control" placeholder="למשל: family-38492" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); font-family: monospace; font-size: 1rem; margin-bottom: 20px; border: 1px solid var(--border-color); background: rgba(15,23,42,0.6); color: var(--text-primary); text-align: center; letter-spacing: 0.5px;" />
           </div>
+          <button class="btn btn-primary" id="btn-join-group-code" style="font-size: 0.95rem; font-weight: 700; padding: 12px; width: 100%; border-radius: var(--border-radius-sm); background: var(--accent-emerald); border: none; cursor: pointer; color: #000; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);">🚀 התחברות לקבוצה</button>
         </div>
       </div>
     </div>

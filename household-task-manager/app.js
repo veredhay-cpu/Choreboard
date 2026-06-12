@@ -57,6 +57,8 @@ const elAdminAddProfileForm = document.getElementById('admin-add-profile-form');
 const elEditProfileOverlay = document.getElementById('edit-profile-overlay');
 const elEditProfileCloseBtn = document.getElementById('edit-profile-close-btn');
 const elAdminEditProfileForm = document.getElementById('admin-edit-profile-form');
+const elFamilySettingsOverlay = document.getElementById('family-settings-overlay');
+const elFamilySettingsCloseBtn = document.getElementById('family-settings-close-btn');
 
 // Edit Task Elements
 const elEditTaskOverlay = document.getElementById('edit-task-overlay');
@@ -200,6 +202,7 @@ async function seedDatabaseIfEmpty(groupId) {
 // State Object
 let state = {
   groupId: null,
+  groupName: 'המשפחה שלי',
   users: [],
   tasks: [],
   history: [],
@@ -220,6 +223,9 @@ let triggeredReminderTimes = {};
 // Function to load local storage state or seed from mockData
 function loadLocalState() {
   const groupSuffix = state.groupId ? `_${state.groupId}` : '';
+  const groupName = localStorage.getItem(`household_group_name${groupSuffix}`);
+  state.groupName = groupName || 'המשפחה שלי';
+
   const users = localStorage.getItem(`household_users${groupSuffix}`);
   const tasks = localStorage.getItem(`household_tasks${groupSuffix}`);
   const history = localStorage.getItem(`household_history${groupSuffix}`);
@@ -283,6 +289,7 @@ function loadLocalState() {
 function saveLocalFallbackState() {
   if (firebaseLoaded) return;
   const groupSuffix = state.groupId ? `_${state.groupId}` : '';
+  localStorage.setItem(`household_group_name${groupSuffix}`, state.groupName || 'המשפחה שלי');
   localStorage.setItem(`household_users${groupSuffix}`, JSON.stringify(state.users));
   localStorage.setItem(`household_tasks${groupSuffix}`, JSON.stringify(state.tasks));
   localStorage.setItem(`household_history${groupSuffix}`, JSON.stringify(state.history));
@@ -294,6 +301,16 @@ let firebaseFallbackTimer = null;
 
 function setupFirebaseListeners() {
   if (!state.groupId) return;
+
+  // Listen to group metadata changes (nickname)
+  db.collection('groups').doc(state.groupId).onSnapshot(doc => {
+    if (doc.exists) {
+      state.groupName = doc.data().name;
+      updateGroupNameUI();
+    }
+  }, error => {
+    console.error("Firebase Group Listener Error:", error);
+  });
 
   db.collection('users').where('groupId', '==', state.groupId).onSnapshot(snapshot => {
     const usersList = [];
@@ -343,6 +360,17 @@ function setupFirebaseListeners() {
   });
 }
 
+function updateGroupNameUI() {
+  const elSubtitle = document.querySelector('.logo-section p');
+  if (elSubtitle && state.groupName) {
+    elSubtitle.textContent = `מערכת המשימות והתגמולים של ${state.groupName}`;
+  }
+  const elNicknameInput = document.getElementById('admin-family-nickname-input');
+  if (elNicknameInput && state.groupName && document.activeElement !== elNicknameInput) {
+    elNicknameInput.value = state.groupName;
+  }
+}
+
 function onStateUpdated() {
   if (state.users.length === 0) return;
 
@@ -350,6 +378,7 @@ function onStateUpdated() {
   if (elFamilyCodeText && state.groupId) {
     elFamilyCodeText.textContent = state.groupId;
   }
+  updateGroupNameUI();
   
   if (isInitialLoad) {
     firebaseLoaded = true;
@@ -384,6 +413,8 @@ function onStateUpdated() {
         panel.classList.remove('active');
       }
     });
+
+
 
     populateAdminAssigneeSelect();
     populateTaskAssigneeFilter();
@@ -426,6 +457,24 @@ function onStateUpdated() {
         console.error(e);
       }
       localStorage.removeItem('household_pending_toast');
+    }
+
+    // New Group Onboarding Banner Logic
+    const isOnboarding = localStorage.getItem('household_new_group_onboarding') === 'true';
+    if (isOnboarding && state.currentUser.role === 'admin') {
+      if (elFamilySettingsOverlay) {
+        elFamilySettingsOverlay.classList.add('active');
+        renderProfilesList();
+      }
+      const elBanner = document.getElementById('admin-onboarding-banner');
+      const elCloseBannerBtn = document.getElementById('close-onboarding-banner-btn');
+      if (elBanner && elCloseBannerBtn) {
+        elBanner.style.display = 'block';
+        elCloseBannerBtn.addEventListener('click', () => {
+          elBanner.style.display = 'none';
+          localStorage.removeItem('household_new_group_onboarding');
+        });
+      }
     }
 
     isInitialLoad = false;
@@ -497,6 +546,117 @@ async function initApp() {
     return;
   }
 
+  // Legacy Migration Check
+  const legacyUsers = localStorage.getItem('household_users');
+  if (legacyUsers && !urlParams.has('join') && !urlParams.has('reset')) {
+    let targetGroupId = localStorage.getItem('household_group_id');
+    if (!targetGroupId) {
+      targetGroupId = `family-${Math.floor(10000 + Math.random() * 90000)}`;
+      localStorage.setItem('household_group_id', targetGroupId);
+    }
+    state.groupId = targetGroupId;
+    
+    try {
+      // 1. Delete any automatically seeded data in this group to avoid mixing
+      const usersSnap = await db.collection('users').where('groupId', '==', targetGroupId).get();
+      const userDeletes = [];
+      usersSnap.forEach(doc => userDeletes.push(doc.ref.delete()));
+      
+      const tasksSnap = await db.collection('tasks').where('groupId', '==', targetGroupId).get();
+      const taskDeletes = [];
+      tasksSnap.forEach(doc => taskDeletes.push(doc.ref.delete()));
+      
+      const historySnap = await db.collection('history').where('groupId', '==', targetGroupId).get();
+      const historyDeletes = [];
+      historySnap.forEach(doc => historyDeletes.push(doc.ref.delete()));
+      
+      await Promise.all([...userDeletes, ...taskDeletes, ...historyDeletes]);
+      
+      // 2. Migrate Users
+      const parsedUsers = JSON.parse(legacyUsers);
+      const userPromises = parsedUsers.map(u => {
+        const uCopy = {
+          ...u,
+          id: `${targetGroupId}-${u.id}`,
+          groupId: targetGroupId
+        };
+        // Update current user mapping if it matches
+        const savedCurrentUser = localStorage.getItem('household_current_user');
+        if (savedCurrentUser === u.id || savedCurrentUser === `${targetGroupId}-${u.id}`) {
+          localStorage.setItem('household_current_user', uCopy.id);
+        }
+        return db.collection('users').doc(uCopy.id).set(uCopy);
+      });
+      
+      // 3. Migrate Tasks
+      const legacyTasks = localStorage.getItem('household_tasks');
+      const parsedTasks = legacyTasks ? JSON.parse(legacyTasks) : [];
+      const taskPromises = parsedTasks.map(t => {
+        const tCopy = {
+          ...t,
+          id: `${targetGroupId}-${t.id}`,
+          groupId: targetGroupId
+        };
+        if (tCopy.assignedTo && tCopy.assignedTo !== 'all') {
+          tCopy.assignedTo = `${targetGroupId}-${tCopy.assignedTo}`;
+        }
+        if (tCopy.completedBy) {
+          tCopy.completedBy = `${targetGroupId}-${tCopy.completedBy}`;
+        }
+        return db.collection('tasks').doc(tCopy.id).set(tCopy);
+      });
+      
+      // 4. Migrate History
+      const legacyHistory = localStorage.getItem('household_history');
+      const parsedHistory = legacyHistory ? JSON.parse(legacyHistory) : [];
+      const historyPromises = parsedHistory.map(h => {
+        const hCopy = {
+          ...h,
+          id: `${targetGroupId}-${h.id}`,
+          groupId: targetGroupId
+        };
+        if (hCopy.completedBy) {
+          hCopy.completedBy = `${targetGroupId}-${hCopy.completedBy}`;
+        }
+        if (hCopy.taskId) {
+          hCopy.taskId = `${targetGroupId}-${hCopy.taskId}`;
+        }
+        return db.collection('history').doc(hCopy.id).set(hCopy);
+      });
+      
+      await Promise.all([...userPromises, ...taskPromises, ...historyPromises]);
+      
+      // Save to group-prefixed localStorage keys
+      localStorage.setItem(`household_users_${targetGroupId}`, JSON.stringify(parsedUsers.map(u => ({ ...u, id: `${targetGroupId}-${u.id}`, groupId: targetGroupId }))));
+      localStorage.setItem(`household_tasks_${targetGroupId}`, JSON.stringify(parsedTasks.map(t => ({ ...t, id: `${targetGroupId}-${t.id}`, groupId: targetGroupId, assignedTo: t.assignedTo && t.assignedTo !== 'all' ? `${targetGroupId}-${t.assignedTo}` : t.assignedTo, completedBy: t.completedBy ? `${targetGroupId}-${t.completedBy}` : t.completedBy }))));
+      localStorage.setItem(`household_history_${targetGroupId}`, JSON.stringify(parsedHistory.map(h => ({ ...h, id: `${targetGroupId}-${h.id}`, groupId: targetGroupId, completedBy: h.completedBy ? `${targetGroupId}-${h.completedBy}` : h.completedBy, taskId: h.taskId ? `${targetGroupId}-${h.taskId}` : h.taskId }))));
+      
+      // Clear legacy localStorage keys to complete migration
+      localStorage.removeItem('household_users');
+      localStorage.removeItem('household_tasks');
+      localStorage.removeItem('household_history');
+      
+      localStorage.setItem('household_visited', 'true');
+      
+      // If the current user doesn't exist in the migrated users, set to the first migrated user
+      const savedCurrentUser = localStorage.getItem('household_current_user');
+      const userExists = parsedUsers.some(u => `${targetGroupId}-${u.id}` === savedCurrentUser || u.id === savedCurrentUser);
+      if (!userExists && parsedUsers.length > 0) {
+        localStorage.setItem('household_current_user', `${targetGroupId}-${parsedUsers[0].id}`);
+      }
+      
+      localStorage.setItem('household_pending_toast', JSON.stringify({
+        message: `משפחתך הועברה בהצלחה לקבוצה: ${targetGroupId}! 🎉`,
+        type: 'success'
+      }));
+      
+      window.location.reload();
+      return;
+    } catch (err) {
+      console.error("Legacy migration failed:", err);
+    }
+  }
+
   // Check if group ID exists
   let groupId = localStorage.getItem('household_group_id');
   
@@ -531,24 +691,42 @@ async function initApp() {
     const btnCreateNewGroup = document.getElementById('btn-create-new-group');
     if (btnCreateNewGroup) {
       btnCreateNewGroup.addEventListener('click', async () => {
+        const inputGroupName = document.getElementById('input-group-name');
+        const groupName = (inputGroupName && inputGroupName.value.trim()) ? inputGroupName.value.trim() : 'המשפחה שלי';
+
         // Generate a random group code, e.g., family-38492
         const randomCode = `family-${Math.floor(10000 + Math.random() * 90000)}`;
         localStorage.setItem('household_group_id', randomCode);
         state.groupId = randomCode;
+        state.groupName = groupName;
         
         // Seed database immediately for this group
         try {
+          // Save group metadata
+          await db.collection('groups').doc(randomCode).set({
+            id: randomCode,
+            name: groupName,
+            createdAt: new Date().toISOString()
+          });
+          
           await seedDatabaseIfEmpty(randomCode);
         } catch (e) {
           console.error("Failed to seed new group:", e);
         }
         
+        // Save nickname locally for fallback
+        localStorage.setItem(`household_group_name_${randomCode}`, groupName);
+
         // Set default current user to Mom (prefixed)
         localStorage.setItem('household_current_user', `${randomCode}-user-mom`);
         localStorage.setItem('household_visited', 'true');
         
+        // Redirect to tasks tab by default for profile updates and open settings modal
+        localStorage.setItem('household_active_tab', 'tasks');
+        localStorage.setItem('household_new_group_onboarding', 'true');
+        
         localStorage.setItem('household_pending_toast', JSON.stringify({
-          message: `הקבוצה ${randomCode} הוקמה בהצלחה! 🎉`,
+          message: `הקבוצה "${groupName}" הוקמה בהצלחה! 🎉`,
           type: 'success'
         }));
         
@@ -942,6 +1120,16 @@ function setTaskFilter(filterName) {
       elTaskAssigneeFilter.value = 'any';
     }
   }
+
+  // Show family member filter dropdown only when "Everyone's Tasks" (all) is selected
+  const elAssigneeFilterContainer = document.getElementById('assignee-filter-container');
+  if (elAssigneeFilterContainer) {
+    if (filterName === 'all') {
+      elAssigneeFilterContainer.style.display = 'flex';
+    } else {
+      elAssigneeFilterContainer.style.display = 'none';
+    }
+  }
 }
 
 function showToast(message, type = 'info') {
@@ -982,13 +1170,13 @@ function updateProfileUI() {
   // Highlight active user and update active balance indicator in dashboard
   elStatActiveBalance.textContent = `₪${state.currentUser.balance}`;
 
-  // Toggle Navigation Admin Tab for parents
-  const elNavAdminTab = document.getElementById('nav-admin-tab');
-  if (elNavAdminTab) {
+  // Toggle Header Admin Gear Button for parents
+  const elHeaderAdminGearBtn = document.getElementById('header-admin-gear-btn');
+  if (elHeaderAdminGearBtn) {
     if (state.currentUser.role === 'admin') {
-      elNavAdminTab.style.display = 'flex';
+      elHeaderAdminGearBtn.style.display = 'flex';
     } else {
-      elNavAdminTab.style.display = 'none';
+      elHeaderAdminGearBtn.style.display = 'none';
     }
   }
 
@@ -1028,7 +1216,7 @@ function switchTab(targetTab) {
       t.classList.remove('active');
     }
   });
-  
+
   // Update Panel class
   elTabPanels.forEach(panel => {
     if (panel.id === `${targetTab}-tab-content`) {
@@ -1047,12 +1235,78 @@ function switchTab(targetTab) {
     renderTasks();
   } else if (targetTab === 'dashboard') {
     renderDashboard();
-  } else if (targetTab === 'admin') {
-    renderAdminPanel();
   }
 }
 
 function bindEvents() {
+  // Header Admin Settings Gear click - opens the Settings Modal
+  const elGearBtn = document.getElementById('header-admin-gear-btn');
+  if (elGearBtn && elFamilySettingsOverlay) {
+    elGearBtn.addEventListener('click', () => {
+      elFamilySettingsOverlay.classList.add('active');
+      renderProfilesList();
+    });
+  }
+
+  const closeSettingsModal = () => {
+    if (elFamilySettingsOverlay) {
+      elFamilySettingsOverlay.classList.remove('active');
+    }
+    localStorage.removeItem('household_new_group_onboarding');
+    const elBanner = document.getElementById('admin-onboarding-banner');
+    if (elBanner) {
+      elBanner.style.display = 'none';
+    }
+  };
+
+  // Settings Modal Close
+  if (elFamilySettingsCloseBtn && elFamilySettingsOverlay) {
+    elFamilySettingsCloseBtn.addEventListener('click', closeSettingsModal);
+    elFamilySettingsOverlay.addEventListener('click', (e) => {
+      if (e.target === elFamilySettingsOverlay) {
+        closeSettingsModal();
+      }
+    });
+  }
+
+  const elFamilySettingsFinishBtn = document.getElementById('family-settings-finish-btn');
+
+  // Collapsible Add Profile Form Toggle
+  const elToggleAddProfileBtn = document.getElementById('toggle-add-profile-btn');
+  if (elToggleAddProfileBtn && elAdminAddProfileForm) {
+    elToggleAddProfileBtn.addEventListener('click', () => {
+      const isHidden = elAdminAddProfileForm.style.display === 'none';
+      if (isHidden) {
+        elAdminAddProfileForm.style.display = 'block';
+        elToggleAddProfileBtn.innerHTML = '➖ ביטול הוספת בן משפחה';
+        elToggleAddProfileBtn.style.borderStyle = 'solid';
+        if (elFamilySettingsFinishBtn) {
+          elFamilySettingsFinishBtn.style.display = 'none';
+        }
+        
+        // Auto scroll to make form fully visible inside settings modal
+        setTimeout(() => {
+          elAdminAddProfileForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
+      } else {
+        elAdminAddProfileForm.style.display = 'none';
+        elToggleAddProfileBtn.innerHTML = '➕ הוספת בן משפחה חדש';
+        elToggleAddProfileBtn.style.borderStyle = 'dashed';
+        if (elFamilySettingsFinishBtn) {
+          elFamilySettingsFinishBtn.style.display = 'block';
+        }
+      }
+    });
+  }
+
+  // Settings Modal Finish Button click
+  if (elFamilySettingsFinishBtn && elFamilySettingsOverlay) {
+    elFamilySettingsFinishBtn.addEventListener('click', () => {
+      closeSettingsModal();
+      showToast('הקבוצה עודכנה בהצלחה! 🏠', 'success');
+    });
+  }
+
   // Push Notification setup click
   if (elEnableNotificationsBtn) {
     if (typeof Notification !== 'undefined') {
@@ -1077,6 +1331,40 @@ function bindEvents() {
     } else {
       elEnableNotificationsBtn.style.display = 'none';
     }
+  }
+
+  // Save Family Nickname Button click
+  const elSaveNicknameBtn = document.getElementById('admin-save-nickname-btn');
+  const elNicknameInput = document.getElementById('admin-family-nickname-input');
+  if (elSaveNicknameBtn && elNicknameInput) {
+    elSaveNicknameBtn.addEventListener('click', async () => {
+      const newNickname = elNicknameInput.value.trim();
+      if (!newNickname) {
+        showToast('נא להזין כינוי תקין למשפחה', 'warning');
+        return;
+      }
+      
+      state.groupName = newNickname;
+      
+      // Update locally for fallback
+      const groupSuffix = state.groupId ? `_${state.groupId}` : '';
+      localStorage.setItem(`household_group_name${groupSuffix}`, newNickname);
+      
+      // Update in Firestore
+      try {
+        await db.collection('groups').doc(state.groupId).set({
+          id: state.groupId,
+          name: newNickname,
+          createdAt: new Date().toISOString()
+        }, { merge: true });
+        showToast('כינוי המשפחה עודכן בהצלחה! 🎉', 'success');
+      } catch (err) {
+        console.error("Failed to update group nickname on Firebase:", err);
+        showToast('שגיאה בעדכון כינוי המשפחה במסד הנתונים', 'warning');
+      }
+      
+      updateGroupNameUI();
+    });
   }
 
   // WhatsApp Share Invite Link Button click
@@ -1149,18 +1437,8 @@ function bindEvents() {
   // Task list Filters
   elFilterButtons.forEach(btn => {
     btn.addEventListener('click', () => {
-      elFilterButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      
       const filter = btn.getAttribute('data-filter');
-      if (elTaskAssigneeFilter) {
-        if (filter === 'my') {
-          elTaskAssigneeFilter.value = state.currentUser.id;
-        } else {
-          elTaskAssigneeFilter.value = 'any';
-        }
-      }
-      
+      setTaskFilter(filter);
       renderTasks();
     });
   });
@@ -1482,6 +1760,23 @@ function bindEvents() {
       document.getElementById('admin-new-profile-color').value = '#8b5cf6';
       selectAvatarOption('admin-new', '👧');
       
+      // Reset collapsible state
+      if (elAdminAddProfileForm) {
+        elAdminAddProfileForm.style.display = 'none';
+      }
+      const elToggleAddProfileBtn = document.getElementById('toggle-add-profile-btn');
+      if (elToggleAddProfileBtn) {
+        elToggleAddProfileBtn.innerHTML = '➕ הוספת בן משפחה חדש';
+        elToggleAddProfileBtn.style.borderStyle = 'dashed';
+      }
+      const elFamilySettingsFinishBtn = document.getElementById('family-settings-finish-btn');
+      if (elFamilySettingsFinishBtn) {
+        elFamilySettingsFinishBtn.style.display = 'block';
+      }
+      
+      // Update the profiles list on the UI immediately
+      renderProfilesList();
+      
       showToast(`הפרופיל עבור ${name} נוצר בהצלחה!`, 'success');
     });
   }
@@ -1592,8 +1887,11 @@ function selectUser(userId) {
     const defaultFilter = user.role === 'admin' ? 'all' : 'my';
     setTaskFilter(defaultFilter);
 
-    // If the new active user is not an admin, redirect them from the admin tab to the tasks tab
+    // If the new active user is not an admin, redirect them from the admin tab to the tasks tab and close settings modal
     if (user.role !== 'admin') {
+      if (elFamilySettingsOverlay) {
+        elFamilySettingsOverlay.classList.remove('active');
+      }
       const activeTab = localStorage.getItem('household_active_tab') || 'tasks';
       if (activeTab === 'admin') {
         localStorage.setItem('household_active_tab', 'tasks');
@@ -1733,17 +2031,38 @@ function renderDashboard() {
   sortedUsers.forEach(u => {
     const rankEl = document.createElement('div');
     rankEl.className = 'ranking-item';
+    
+    const isParent = state.currentUser.role === 'admin';
+    const canPayout = u.balance > 0;
+    
     rankEl.innerHTML = `
       <div class="ranking-user">
         <span class="ranking-avatar">${getAvatarHTML(u.avatar)}</span>
-        <span class="ranking-name">${u.name}</span>
+        <div style="display: flex; flex-direction: column;">
+          <span class="ranking-name">${u.name}</span>
+          ${isParent ? `<span style="font-size: 0.7rem; color: var(--text-secondary);">${u.role === 'admin' ? 'הורה' : 'ילד/משתתף'}</span>` : ''}
+        </div>
       </div>
-      <span class="ranking-amount" style="display: flex; gap: 8px; align-items: center;">
-        <span style="color: var(--accent-emerald); font-weight: 700;">₪${u.balance}</span>
-        <span style="color: var(--text-muted); font-size: 0.8rem;">|</span>
-        <span style="color: #a78bfa; font-weight: 700;">⭐ ${u.stars || 0}</span>
-      </span>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span class="ranking-amount" style="display: flex; gap: 8px; align-items: center;">
+          <span style="color: var(--accent-emerald); font-weight: 700;">₪${u.balance}</span>
+          <span style="color: var(--text-muted); font-size: 0.8rem;">|</span>
+          <span style="color: #a78bfa; font-weight: 700;">⭐ ${u.stars || 0}</span>
+        </span>
+        ${isParent && u.role !== 'admin' ? `
+          <button type="button" class="btn btn-primary btn-payout-dashboard" style="padding: 4px 10px; font-size: 0.8rem; background: var(--accent-emerald); border: none; border-radius: var(--border-radius-sm); cursor: pointer; font-weight: bold; color: #000;" ${canPayout ? '' : 'disabled'}>
+            💵 שלם
+          </button>
+        ` : ''}
+      </div>
     `;
+    
+    if (isParent && u.role !== 'admin' && canPayout) {
+      rankEl.querySelector('.btn-payout-dashboard').addEventListener('click', () => {
+        payoutUser(u.id);
+      });
+    }
+    
     elRankingList.appendChild(rankEl);
   });
 }
@@ -2398,47 +2717,7 @@ window.closeModalAndComplete = function(taskId) {
 
 // Admin Panel Logic
 function renderAdminPanel() {
-  // Show listing of users with reset/payout actions
-  elAdminUsersList.innerHTML = '';
-  state.users.forEach(user => {
-    const item = document.createElement('div');
-    item.className = 'admin-user-item';
-    
-    // Only enable payout for kids/members with balance > 0
-    const canPayout = user.balance > 0;
-    
-    item.innerHTML = `
-      <div class="admin-user-details">
-        <span style="font-size: 1.8rem; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 50%;">${getAvatarHTML(user.avatar)}</span>
-        <div class="admin-user-balance-info">
-          <span style="font-weight: 700;">${user.name}</span>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">${user.role === 'admin' ? 'הורה' : 'ילד/משתתף'}</span>
-        </div>
-      </div>
-      <div style="display:flex; align-items:center; gap: 12px;">
-        <span class="admin-user-balance" style="display: flex; gap: 8px; align-items: center;">
-          <span style="color: var(--accent-emerald); font-weight: 700;">₪${user.balance}</span>
-          <span style="color: var(--text-muted); font-size: 0.8rem;">|</span>
-          <span style="color: #a78bfa; font-weight: 700;">⭐ ${user.stars || 0}</span>
-        </span>
-        ${state.currentUser.role === 'admin' ? `
-          <button type="button" class="btn-payout btn-payout-user" ${canPayout ? '' : 'disabled'}>
-            💵 בצע תשלום
-          </button>
-        ` : `<span style="font-size:0.75rem; color:var(--text-muted);">דרוש הרשאת הורה</span>`}
-      </div>
-    `;
-    
-    if (state.currentUser.role === 'admin' && canPayout) {
-      item.querySelector('.btn-payout-user').addEventListener('click', () => {
-        payoutUser(user.id);
-      });
-    }
-    
-    elAdminUsersList.appendChild(item);
-  });
-
-  // Dynamically render the profiles manager list too
+  // Dynamically render the profiles manager list in the settings modal
   renderProfilesList();
 }
 

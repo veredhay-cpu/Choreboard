@@ -1438,6 +1438,10 @@ header {
 
 /* Mobile Responsiveness Improvements */
 @media (max-width: 768px) {
+  html {
+    font-size: 17.5px; /* Scale up all rem-based typography on mobile */
+  }
+
   .app-container {
     padding: 12px 8px;
     gap: 16px;
@@ -1451,7 +1455,10 @@ header {
   }
   
   .logo-section p {
-    display: none; /* Hide subtitle to save vertical space */
+    display: block; /* Show family nickname subtitle on mobile! */
+    font-size: 0.9rem;
+    margin-top: 4px;
+    color: var(--text-secondary);
   }
   
   .profile-bar {
@@ -1475,12 +1482,12 @@ header {
   }
   
   .profile-name {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
   }
   
   .switcher-btn {
     padding: 6px 12px;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
   }
   
   .nav-tabs {
@@ -1495,12 +1502,12 @@ header {
   
   .nav-tab {
     padding: 10px 14px;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
   }
 
   .nav-tab-action-btn {
     padding: 10px 14px;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
   }
   
   .task-filters {
@@ -1519,7 +1526,7 @@ header {
   
   .filter-btn {
     padding: 6px 12px;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
   }
   
   #assignee-filter-container {
@@ -1528,9 +1535,9 @@ header {
   }
   
   #task-assignee-filter {
-    padding: 4px 8px !important;
-    font-size: 0.8rem !important;
-    width: 120px !important;
+    padding: 6px 12px !important;
+    font-size: 0.9rem !important;
+    width: 140px !important;
   }
   
   .tasks-section-grid {
