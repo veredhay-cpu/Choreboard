@@ -34,6 +34,17 @@
   --text-secondary: #c084fc;
   --text-muted: #8b5cf680;
   
+  --btn-share-wa-bg: rgba(37, 211, 102, 0.1);
+  --btn-share-wa-border: rgba(37, 211, 102, 0.25);
+  --btn-share-wa-color: #25d366;
+  
+  --btn-share-mail-bg: rgba(59, 130, 246, 0.1);
+  --btn-share-mail-border: rgba(59, 130, 246, 0.25);
+  --btn-share-mail-color: #60a5fa;
+  
+  --profile-email-color: #60a5fa;
+  --profile-phone-color: #34d399;
+  
   --font-family: 'Heebo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --border-radius-lg: 16px;
   --border-radius-md: 12px;
@@ -117,7 +128,7 @@ header {
 .logo-section h1 {
   font-size: 1.8rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #a78bfa 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, var(--accent-purple) 0%, var(--btn-primary-hover-bg) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: flex;
@@ -577,7 +588,7 @@ header {
 
 .filter-btn {
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-color);
+  border: 1.5px solid var(--border-color);
   color: var(--text-secondary);
   padding: 8px 16px;
   border-radius: 50px;
@@ -590,6 +601,15 @@ header {
 .filter-btn:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-primary);
+  border-color: var(--border-color-active);
+}
+
+.filter-btn.active {
+  background: var(--accent-purple);
+  color: #120a21;
+  border-color: var(--accent-purple);
+  font-weight: 700;
+  box-shadow: 0 4px 12px var(--accent-purple-glow);
 }
 
 
@@ -1113,6 +1133,15 @@ header {
   box-shadow: 0 0 10px rgba(139, 92, 246, 0.15);
 }
 
+.family-nickname-input {
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: var(--border-radius-sm);
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1133,6 +1162,69 @@ header {
   background: rgba(255, 255, 255, 0.02);
   border-radius: var(--border-radius-md);
   border: 1px solid var(--border-color);
+}
+
+.btn-share-wa {
+  background: var(--btn-share-wa-bg);
+  border: 1px solid var(--btn-share-wa-border);
+  color: var(--btn-share-wa-color);
+  padding: 6px 12px;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  margin-left: 4px;
+  transition: var(--transition-smooth);
+}
+
+.btn-share-wa:hover {
+  background: rgba(37, 211, 102, 0.2);
+  transform: translateY(-1px);
+}
+
+body.theme-light .btn-share-wa:hover {
+  background: rgba(4, 120, 87, 0.15) !important;
+}
+
+.btn-share-mail {
+  background: var(--btn-share-mail-bg);
+  border: 1px solid var(--btn-share-mail-border);
+  color: var(--btn-share-mail-color);
+  padding: 6px 12px;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  transition: var(--transition-smooth);
+}
+
+.btn-share-mail:hover {
+  background: rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
+}
+
+body.theme-light .btn-share-mail:hover {
+  background: rgba(29, 78, 216, 0.15) !important;
+}
+
+.profile-detail-email {
+  font-size: 0.75rem;
+  color: var(--profile-email-color);
+  display: block;
+  margin-top: 2px;
+}
+
+.profile-detail-phone {
+  font-size: 0.75rem;
+  color: var(--profile-phone-color);
+  display: block;
+  margin-top: 1px;
 }
 
 .admin-user-details {
@@ -1755,12 +1847,23 @@ body.theme-light {
   --shadow-card-paid-hover: rgba(16, 185, 129, 0.05);
   
   --shadow-glow: 0 4px 20px rgba(139, 92, 246, 0.08);
-  --gradient-color-1: rgba(139, 92, 246, 0.08);
-  --gradient-color-2: rgba(236, 72, 153, 0.05);
+  --gradient-color-1: rgba(139, 92, 246, 0.18);
+  --gradient-color-2: rgba(236, 72, 153, 0.12);
   
   --btn-primary-bg: #8b5cf6;
   --btn-primary-hover-bg: #7c3aed;
   --btn-primary-text: #ffffff;
+  
+  --btn-share-wa-bg: rgba(4, 120, 87, 0.08);
+  --btn-share-wa-border: rgba(4, 120, 87, 0.25);
+  --btn-share-wa-color: #065f46;
+  
+  --btn-share-mail-bg: rgba(29, 78, 216, 0.08);
+  --btn-share-mail-border: rgba(29, 78, 216, 0.25);
+  --btn-share-mail-color: #1d4ed8;
+  
+  --profile-email-color: #1d4ed8;
+  --profile-phone-color: #065f46;
 }
 
 body.theme-light .menu-card {
@@ -1781,6 +1884,105 @@ body.theme-light .form-control {
 body.theme-light .btn-secondary:hover {
   background: rgba(15, 23, 42, 0.04) !important;
 }
+
+body.theme-light .family-nickname-input {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+  color: #0f172a !important;
+}
+
+body.theme-light .user-picker-overlay {
+  background: rgba(109, 40, 217, 0.15) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+body.theme-light .user-picker-modal {
+  background: rgba(255, 255, 255, 0.88) !important;
+  box-shadow: 0 20px 40px rgba(139, 92, 246, 0.12) !important;
+  border: 1px solid rgba(139, 92, 246, 0.15) !important;
+}
+
+body.theme-light .admin-user-item {
+  background: #ffffff !important;
+  border: 1px solid rgba(139, 92, 246, 0.12) !important;
+  box-shadow: 0 3px 10px rgba(139, 92, 246, 0.04) !important;
+}
+
+body.theme-light .admin-user-item:hover {
+  border-color: rgba(139, 92, 246, 0.35) !important;
+  box-shadow: 0 5px 15px rgba(139, 92, 246, 0.08) !important;
+}
+
+body.theme-light #admin-family-nickname-display,
+body.theme-light #admin-family-code-display {
+  background: rgba(139, 92, 246, 0.04) !important;
+  border: 1px solid rgba(139, 92, 246, 0.12) !important;
+}
+
+body.theme-light #toggle-add-profile-btn {
+  background: rgba(139, 92, 246, 0.04) !important;
+  border: 1px dashed rgba(139, 92, 246, 0.25) !important;
+  color: var(--accent-purple) !important;
+}
+
+body.theme-light #toggle-add-profile-btn:hover {
+  background: rgba(139, 92, 246, 0.08) !important;
+  border-color: var(--accent-purple) !important;
+}
+
+body.theme-light .google-login-btn {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.theme-light .google-login-btn:hover {
+  background: #f8fafc !important;
+  border-color: rgba(139, 92, 246, 0.35) !important;
+}
+
+body.theme-light .toast {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08) !important;
+  border-right: 4px solid var(--accent-purple) !important;
+}
+
+body.theme-light .toast.success {
+  border-right-color: var(--accent-emerald) !important;
+}
+
+body.theme-light .toast.email {
+  border-right-color: #3b82f6 !important;
+}
+
+body.theme-light .toast.warning {
+  border-right-color: #f59e0b !important;
+}
+
+body.theme-light .filter-btn {
+  border: 2px solid rgba(139, 92, 246, 0.6) !important;
+  background: rgba(139, 92, 246, 0.02) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 500 !important;
+}
+
+body.theme-light .filter-btn:hover {
+  background: rgba(139, 92, 246, 0.08) !important;
+  border-color: var(--accent-purple) !important;
+  color: var(--accent-purple) !important;
+}
+
+body.theme-light .filter-btn.active {
+  background: var(--accent-purple) !important;
+  color: #ffffff !important;
+  border-color: var(--accent-purple) !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25) !important;
+}
+
 body.theme-emerald {
   --bg-primary: #022c22;
   --bg-secondary: #064e3b;
@@ -2285,9 +2487,11 @@ body.theme-midnight {
 }
 
 #btn-back-to-home:hover, #btn-dashboard-back-to-home:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
+  background: var(--accent-purple) !important;
   border-color: var(--accent-purple) !important;
   color: #fff !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px var(--accent-purple-glow), var(--shadow-glow) !important;
 }
 
 /* Card theme selector style overrides */

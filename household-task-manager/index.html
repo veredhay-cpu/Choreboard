@@ -31,16 +31,7 @@
           <div class="profile-switch-indicator" style="font-size: 0.9rem; color: var(--text-secondary); margin-right: 8px; margin-left: 2px; display: flex; align-items: center;">🔄</div>
         </div>
         
-        <!-- Google Sign-In Button -->
-        <button class="google-login-btn" id="header-google-login-btn" style="display: none; align-items: center; gap: 8px; font-weight: bold; padding: 8px 16px; border-radius: 20px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: var(--transition-smooth); font-size: 0.9rem;">
-          <svg class="google-icon" viewBox="0 0 24 24" style="width: 18px; height: 18px; flex-shrink: 0;">
-            <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 14.98 1 12 1 7.24 1 3.2 3.74 1.25 7.72l3.86 3C6.07 7.74 8.78 5.04 12 5.04z"/>
-            <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.92c2.2-2.03 3.67-5.02 3.67-8.65z"/>
-            <path fill="#FBBC05" d="M5.11 14.72c-.26-.77-.4-1.6-.4-2.47s.14-1.7.4-2.47L1.25 7.72C.45 9.36 0 11.13 0 13s.45 3.64 1.25 5.28l3.86-3z"/>
-            <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.92c-1.08.72-2.45 1.16-4.2 1.16-3.22 0-5.93-2.7-6.89-5.68l-3.86 3C3.2 20.26 7.24 23 12 23z"/>
-          </svg>
-          <span>התחבר עם Google</span>
-        </button>
+
 
         <!-- Create Group Button -->
         <button class="btn btn-primary" id="header-create-group-btn" style="display: none; align-items: center; gap: 8px; font-weight: bold; padding: 8px 16px; border-radius: 20px; background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; color: #fff; cursor: pointer; transition: var(--transition-smooth); font-size: 0.9rem;">
@@ -77,18 +68,8 @@
           <div class="menu-card" id="menu-card-tasks">
             <div class="menu-card-icon">📋</div>
             <div style="flex-grow: 1; text-align: right; direction: rtl;">
-              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">משימות המשפחה</h3>
+              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">ניהול משימות</h3>
               <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">צפייה במשימות, סינונים ועדכון ביצוע</p>
-            </div>
-            <div style="font-size: 1.1rem; color: var(--text-muted);">👈</div>
-          </div>
-          
-          <!-- Card: Dashboard -->
-          <div class="menu-card" id="menu-card-dashboard">
-            <div class="menu-card-icon">📊</div>
-            <div style="flex-grow: 1; text-align: right; direction: rtl;">
-              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">לוח בקרה</h3>
-              <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">סטטיסטיקות, ביצועים ויתרות כספיות</p>
             </div>
             <div style="font-size: 1.1rem; color: var(--text-muted);">👈</div>
           </div>
@@ -99,6 +80,16 @@
             <div style="flex-grow: 1; text-align: right; direction: rtl;">
               <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">הגדרות וניהול משפחה</h3>
               <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">עריכת פרופילים, קוד קבוצה והזמנות</p>
+            </div>
+            <div style="font-size: 1.1rem; color: var(--text-muted);">👈</div>
+          </div>
+
+          <!-- Card: Dashboard -->
+          <div class="menu-card" id="menu-card-dashboard">
+            <div class="menu-card-icon">📊</div>
+            <div style="flex-grow: 1; text-align: right; direction: rtl;">
+              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">לוח בקרה</h3>
+              <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">סטטיסטיקות, ביצועים ויתרות כספיות</p>
             </div>
             <div style="font-size: 1.1rem; color: var(--text-muted);">👈</div>
           </div>
@@ -128,13 +119,15 @@
       <!-- DASHBOARD PANEL -->
       <section class="tab-content" id="dashboard-tab-content">
         
-        <!-- Back to Home Bar -->
-        <div class="back-to-home-bar">
-          <button class="btn btn-secondary" id="btn-dashboard-back-to-home" style="display: flex; align-items: center; gap: 6px; font-weight: bold; padding: 6px 14px; border-radius: 50px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; font-size: 0.85rem;">
+        <!-- Back to Home Button -->
+        <div style="display: flex; justify-content: flex-start; margin-bottom: 16px;">
+          <button class="btn btn-primary" id="btn-dashboard-back-to-home" style="display: flex; align-items: center; gap: 8px; font-weight: 800; padding: 10px 22px; border-radius: 50px; background: transparent; border: 2px solid var(--accent-purple); color: var(--accent-purple); cursor: pointer; font-size: 0.95rem; transition: var(--transition-smooth);">
             🏡 חזרה לדף הבית
           </button>
-          <h2 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">📊 לוח בקרה</h2>
         </div>
+        
+        <!-- Screen Title (Large, below) -->
+        <h2 style="margin: 0 0 20px 0; font-size: 1.8rem; font-weight: 800; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">📊 לוח בקרה</h2>
         <div class="dashboard-grid">
           
           <div class="stat-card glass-panel pending" id="stat-card-pending" style="cursor: pointer;">
@@ -191,13 +184,15 @@
       <!-- TASKS BOARD PANEL -->
       <section class="tab-content" id="tasks-tab-content">
         
-        <!-- Back to Home Bar -->
-        <div class="back-to-home-bar">
-          <button class="btn btn-secondary" id="btn-back-to-home" style="display: flex; align-items: center; gap: 6px; font-weight: bold; padding: 6px 14px; border-radius: 50px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; font-size: 0.85rem;">
+        <!-- Back to Home Button -->
+        <div style="display: flex; justify-content: flex-start; margin-bottom: 16px;">
+          <button class="btn btn-primary" id="btn-back-to-home" style="display: flex; align-items: center; gap: 8px; font-weight: 800; padding: 10px 22px; border-radius: 50px; background: transparent; border: 2px solid var(--accent-purple); color: var(--accent-purple); cursor: pointer; font-size: 0.95rem; transition: var(--transition-smooth);">
             🏡 חזרה לדף הבית
           </button>
-          <h2 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">📋 משימות המשפחה</h2>
         </div>
+        
+        <!-- Screen Title (Large, below) -->
+        <h2 style="margin: 0 0 20px 0; font-size: 1.8rem; font-weight: 800; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">📋 ניהול משימות</h2>
 
         <!-- Create Task Button on Tasks Page -->
         <button class="btn btn-primary" id="btn-create-task-on-tasks-page" style="width: 100%; margin: 12px 0; background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; font-weight: bold; padding: 12px; font-size: 0.95rem; cursor: pointer; box-shadow: var(--shadow-glow); border-radius: var(--border-radius-md); display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -259,6 +254,17 @@
 
       <div class="admin-actions-bar" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
 
+        <!-- Google Sign-In Button -->
+        <button class="google-login-btn" id="settings-google-login-btn" style="display: none; width: 100%; align-items: center; justify-content: center; gap: 8px; font-weight: bold; padding: 12px; font-size: 1rem; cursor: pointer; border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.03); color: var(--text-primary); border-radius: var(--border-radius-md); transition: var(--transition-smooth);">
+          <svg class="google-icon" viewBox="0 0 24 24" style="width: 18px; height: 18px; flex-shrink: 0;">
+            <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 14.98 1 12 1 7.24 1 3.2 3.74 1.25 7.72l3.86 3C6.07 7.74 8.78 5.04 12 5.04z"/>
+            <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.92c2.2-2.03 3.67-5.02 3.67-8.65z"/>
+            <path fill="#FBBC05" d="M5.11 14.72c-.26-.77-.4-1.6-.4-2.47s.14-1.7.4-2.47L1.25 7.72C.45 9.36 0 11.13 0 13s.45 3.64 1.25 5.28l3.86-3z"/>
+            <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.92c-1.08.72-2.45 1.16-4.2 1.16-3.22 0-5.93-2.7-6.89-5.68l-3.86 3C3.2 20.26 7.24 23 12 23z"/>
+          </svg>
+          <span>התחבר עם Google</span>
+        </button>
+
         <!-- Google Sign Out Button -->
         <button class="btn btn-secondary" id="settings-signout-btn" style="display: none; width: 100%; align-items: center; justify-content: center; gap: 8px; font-weight: bold; padding: 12px; font-size: 1rem; cursor: pointer; border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.05); color: #f87171; border-radius: var(--border-radius-md); transition: var(--transition-smooth);">
           🚪 התנתק מחשבון Google
@@ -275,7 +281,7 @@
         <div id="admin-family-nickname-display" style="font-size: 0.95rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: var(--border-radius-md); font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; gap: 8px; flex-grow: 1;">
             <span>כינוי המשפחה:</span>
-            <input type="text" id="admin-family-nickname-input" class="form-control" placeholder="הקלד שם ליצירת קבוצה" style="padding: 4px 8px; font-size: 0.9rem; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); width: 140px; height: auto;" />
+            <input type="text" id="admin-family-nickname-input" class="form-control family-nickname-input" placeholder="הקלד שם ליצירת קבוצה" style="width: 140px; height: auto;" />
           </div>
           <button class="btn btn-primary" id="admin-save-nickname-btn" style="padding: 6px 16px; font-size: 0.9rem; background: var(--accent-purple); border: none; border-radius: var(--border-radius-sm); cursor: pointer; font-weight: bold;">שמור 💾</button>
         </div>

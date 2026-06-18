@@ -598,20 +598,31 @@ async function initApp() {
   // Direct Auto-Login Routing via Invite Link
   const groupParam = urlParams.get('group');
   const userIdParam = urlParams.get('userId');
+  const joinParam = urlParams.get('join');
+
   if (groupParam && userIdParam) {
     localStorage.setItem('household_group_id', groupParam);
     localStorage.setItem('household_current_user', userIdParam);
     localStorage.setItem('household_visited', 'true');
+    // Clear old profile so we fetch the fresh one
+    localStorage.removeItem('household_user_profile');
     // Clean up url params and reload
     window.history.replaceState({}, document.title, window.location.pathname);
     window.location.reload();
     return;
   }
 
+  if (joinParam && groupParam) {
+    localStorage.setItem('household_group_id', groupParam);
+    localStorage.setItem('household_visited', 'true');
+    // Clear old profile so a new one can be registered
+    localStorage.removeItem('household_user_profile');
+  }
+
   // Setup Google Auth State Listener
   if (auth) {
     auth.onAuthStateChanged(async (user) => {
-      const loginBtn = document.getElementById('header-google-login-btn');
+      const loginBtn = document.getElementById('settings-google-login-btn');
       const signoutBtn = document.getElementById('settings-signout-btn');
       
       if (user) {
@@ -679,8 +690,8 @@ async function initApp() {
                   balance: 0,
                   stars: 0,
                   groupId: googleGroupId,
-                  email: user.email || 'mom@startask.com',
-                  phone: '050-1111111'
+                  email: user.email || '',
+                  phone: ''
                 };
                 // Only the current user is added to the newly created group
                 const defaultUsers = [userProfile];
@@ -772,8 +783,8 @@ async function initApp() {
               balance: 0,
               stars: 0,
               groupId: googleGroupId,
-              email: user.email || 'mom@startask.com',
-              phone: '050-1111111'
+              email: user.email || '',
+              phone: ''
             };
             try {
               await db.collection('users').doc(userProfile.id).set(userProfile);
@@ -861,8 +872,9 @@ async function initApp() {
 
   // Onboarding Profile Wizard Check
   const savedProfile = localStorage.getItem('household_user_profile');
+  const savedGroupId = localStorage.getItem('household_group_id');
   
-  if (!savedProfile) {
+  if (!savedProfile && (!savedGroupId || savedGroupId === 'local-sandbox')) {
     // FIRST ENTRY (Bypassing wizard entirely):
     const defaultMom = {
       id: 'user-mom',
@@ -873,13 +885,13 @@ async function initApp() {
       balance: 0,
       stars: 0,
       groupId: 'local-sandbox',
-      email: 'mom@startask.com',
-      phone: '050-1111111'
+      email: '',
+      phone: ''
     };
     
     const defaultUsers = [
       defaultMom,
-      { id: 'user-dad', name: 'אבא', role: 'admin', avatar: '👨‍🦱', color: '#3b82f6', balance: 0, stars: 0, groupId: 'local-sandbox', email: 'dad@startask.com', phone: '050-2222222' },
+      { id: 'user-dad', name: 'אבא', role: 'admin', avatar: '👨‍🦱', color: '#3b82f6', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' },
       { id: 'user-kid1', name: 'ילד 1', role: 'member', avatar: '👦', color: '#10b981', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' },
       { id: 'user-kid2', name: 'ילד 2', role: 'member', avatar: '👧', color: '#f59e0b', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' }
     ];
@@ -1428,7 +1440,7 @@ function switchTab(targetTab) {
 
 function bindEvents() {
   // Google Sign-In and Sign-Out event listeners
-  const elGoogleLoginBtn = document.getElementById('header-google-login-btn');
+  const elGoogleLoginBtn = document.getElementById('settings-google-login-btn');
   if (elGoogleLoginBtn) {
     elGoogleLoginBtn.addEventListener('click', loginWithGoogle);
   }
@@ -3277,8 +3289,8 @@ function renderProfilesList() {
     let inviteButtonsHTML = '';
     if (!isSelf) {
       inviteButtonsHTML = `
-        <button type="button" class="btn btn-share-wa" title="הזמן בוואטסאפ" style="background: rgba(37, 211, 102, 0.1); border: 1px solid rgba(37, 211, 102, 0.2); color: #25d366; padding: 6px 10px; border-radius: var(--border-radius-sm); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-weight: bold; margin-left: 4px;">💬 הזמן</button>
-        <button type="button" class="btn btn-share-mail" title="הזמן במייל" style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 6px 10px; border-radius: var(--border-radius-sm); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-weight: bold;">✉️ הזמן</button>
+        <button type="button" class="btn btn-share-wa" title="הזמן בוואטסאפ">💬 הזמן</button>
+        <button type="button" class="btn btn-share-mail" title="הזמן במייל">✉️ הזמן</button>
       `;
     }
 
@@ -3288,8 +3300,8 @@ function renderProfilesList() {
         <div class="admin-user-balance-info">
           <span style="font-weight: 700;">${user.name} ${isSelf ? '<span style="font-size: 0.75rem; color: #a78bfa; font-weight: 500;">(אני)</span>' : ''}</span>
           <span style="font-size: 0.75rem; color: var(--text-secondary);">${user.role === 'admin' ? 'הורה (מנהל)' : 'ילד / משתתף'}</span>
-          ${user.email ? `<span style="font-size: 0.7rem; color: #60a5fa; display: block; margin-top: 2px;">✉️ ${user.email}</span>` : ''}
-          ${user.phone ? `<span style="font-size: 0.7rem; color: #34d399; display: block; margin-top: 1px;">📱 ${user.phone}</span>` : ''}
+          ${user.email ? `<span class="profile-detail-email">✉️ ${user.email}</span>` : ''}
+          ${user.phone ? `<span class="profile-detail-phone">📱 ${user.phone}</span>` : ''}
         </div>
       </div>
       <div style="display:flex; align-items:center; gap: 8px;">
@@ -4180,8 +4192,8 @@ function initOnboardingWizard() {
         balance: 0,
         stars: 0,
         groupId: 'local-sandbox',
-        email: wizardData.role === 'mom' ? 'mom@startask.com' : (wizardData.role === 'dad' ? 'dad@startask.com' : ''),
-        phone: wizardData.role === 'mom' ? '050-1111111' : (wizardData.role === 'dad' ? '050-2222222' : '')
+        email: '',
+        phone: ''
       };
       
       localStorage.removeItem('household_tasks_local-sandbox');
@@ -4190,16 +4202,16 @@ function initOnboardingWizard() {
       // Seed default family members (Mom, Dad, Kid 1, Kid 2) ensuring they all exist
       const defaultUsers = [userProfile];
       if (wizardData.role === 'mom') {
-        defaultUsers.push({ id: 'user-dad', name: 'אבא', role: 'admin', avatar: '👨‍🦱', color: '#3b82f6', balance: 0, stars: 0, groupId: 'local-sandbox', email: 'dad@startask.com', phone: '050-2222222' });
+        defaultUsers.push({ id: 'user-dad', name: 'אבא', role: 'admin', avatar: '👨‍🦱', color: '#3b82f6', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
         defaultUsers.push({ id: 'user-kid1', name: 'ילד 1', role: 'member', avatar: '👦', color: '#10b981', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
         defaultUsers.push({ id: 'user-kid2', name: 'ילד 2', role: 'member', avatar: '👧', color: '#f59e0b', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
       } else if (wizardData.role === 'dad') {
-        defaultUsers.push({ id: 'user-mom', name: 'אמא', role: 'admin', avatar: '👩‍🦰', color: '#ec4899', balance: 0, stars: 0, groupId: 'local-sandbox', email: 'mom@startask.com', phone: '050-1111111' });
+        defaultUsers.push({ id: 'user-mom', name: 'אמא', role: 'admin', avatar: '👩‍🦰', color: '#ec4899', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
         defaultUsers.push({ id: 'user-kid1', name: 'ילד 1', role: 'member', avatar: '👦', color: '#10b981', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
         defaultUsers.push({ id: 'user-kid2', name: 'ילד 2', role: 'member', avatar: '👧', color: '#f59e0b', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
       } else { // child
-        defaultUsers.push({ id: 'user-mom', name: 'אמא', role: 'admin', avatar: '👩‍🦰', color: '#ec4899', balance: 0, stars: 0, groupId: 'local-sandbox', email: 'mom@startask.com', phone: '050-1111111' });
-        defaultUsers.push({ id: 'user-dad', name: 'אבא', role: 'admin', avatar: '👨‍🦱', color: '#3b82f6', balance: 0, stars: 0, groupId: 'local-sandbox', email: 'dad@startask.com', phone: '050-2222222' });
+        defaultUsers.push({ id: 'user-mom', name: 'אמא', role: 'admin', avatar: '👩‍🦰', color: '#ec4899', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
+        defaultUsers.push({ id: 'user-dad', name: 'אבא', role: 'admin', avatar: '👨‍🦱', color: '#3b82f6', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
         defaultUsers.push({ id: 'user-kid2', name: 'ילד 2', role: 'member', avatar: '👧', color: '#f59e0b', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
       }
       
