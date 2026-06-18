@@ -80,9 +80,20 @@ const firebaseConfig = {
   measurementId: "G-NRXVF16WYH"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+// Initialize Firebase if loaded
+let db = null;
+let auth = null;
+if (typeof firebase !== 'undefined') {
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+  } catch (e) {
+    console.error("Failed to initialize Firebase:", e);
+  }
+} else {
+  console.warn("Firebase script not loaded. Cloud features will be disabled.");
+}
 
 // Helper to show Firebase errors clearly on the UI
 function showFirebaseErrorAlert(source, error) {
@@ -135,7 +146,8 @@ function errorCodeContains(msg, term) {
 
 // Function to seed initial data in Firestore if empty for the current group
 async function seedDatabaseIfEmpty(groupId) {
-  if (!groupId) return;
+  if (!db) return;
+  if (!groupId || groupId === 'local-sandbox') return;
   try {
     const usersSnap = await db.collection('users').where('groupId', '==', groupId).get();
     if (usersSnap.empty) {
@@ -233,14 +245,23 @@ function loadLocalState() {
   if (users) {
     state.users = JSON.parse(users);
   } else {
-    state.users = JSON.parse(JSON.stringify(window.householdMockData.users));
-    if (state.groupId) {
-      state.users.forEach(u => {
-        u.groupId = state.groupId;
-        if (!u.id.startsWith(state.groupId + '-')) {
-          u.id = `${state.groupId}-${u.id}`;
-        }
-      });
+    if (state.groupId === 'local-sandbox') {
+      const savedProfile = localStorage.getItem('household_user_profile');
+      if (savedProfile) {
+        state.users = [JSON.parse(savedProfile)];
+      } else {
+        state.users = [];
+      }
+    } else {
+      state.users = JSON.parse(JSON.stringify(window.householdMockData.users));
+      if (state.groupId) {
+        state.users.forEach(u => {
+          u.groupId = state.groupId;
+          if (!u.id.startsWith(state.groupId + '-')) {
+            u.id = `${state.groupId}-${u.id}`;
+          }
+        });
+      }
     }
     localStorage.setItem(`household_users${groupSuffix}`, JSON.stringify(state.users));
   }
@@ -248,17 +269,21 @@ function loadLocalState() {
   if (tasks) {
     state.tasks = JSON.parse(tasks);
   } else {
-    state.tasks = JSON.parse(JSON.stringify(window.householdMockData.tasks));
-    if (state.groupId) {
-      state.tasks.forEach(t => {
-        t.groupId = state.groupId;
-        if (!t.id.startsWith(state.groupId + '-')) {
-          t.id = `${state.groupId}-${t.id}`;
-        }
-        if (t.assignee && t.assignee !== 'all' && !t.assignee.startsWith(state.groupId + '-')) {
-          t.assignee = `${state.groupId}-${t.assignee}`;
-        }
-      });
+    if (state.groupId === 'local-sandbox') {
+      state.tasks = [];
+    } else {
+      state.tasks = JSON.parse(JSON.stringify(window.householdMockData.tasks));
+      if (state.groupId) {
+        state.tasks.forEach(t => {
+          t.groupId = state.groupId;
+          if (!t.id.startsWith(state.groupId + '-')) {
+            t.id = `${state.groupId}-${t.id}`;
+          }
+          if (t.assignedTo && t.assignedTo !== 'all' && !t.assignedTo.startsWith(state.groupId + '-')) {
+            t.assignedTo = `${state.groupId}-${t.assignedTo}`;
+          }
+        });
+      }
     }
     localStorage.setItem(`household_tasks${groupSuffix}`, JSON.stringify(state.tasks));
   }
@@ -266,20 +291,24 @@ function loadLocalState() {
   if (history) {
     state.history = JSON.parse(history);
   } else {
-    state.history = JSON.parse(JSON.stringify(window.householdMockData.history));
-    if (state.groupId) {
-      state.history.forEach(h => {
-        h.groupId = state.groupId;
-        if (!h.id.startsWith(state.groupId + '-')) {
-          h.id = `${state.groupId}-${h.id}`;
-        }
-        if (h.completedBy && !h.completedBy.startsWith(state.groupId + '-')) {
-          h.completedBy = `${state.groupId}-${h.completedBy}`;
-        }
-        if (h.taskId && !h.taskId.startsWith(state.groupId + '-')) {
-          h.taskId = `${state.groupId}-${h.taskId}`;
-        }
-      });
+    if (state.groupId === 'local-sandbox') {
+      state.history = [];
+    } else {
+      state.history = JSON.parse(JSON.stringify(window.householdMockData.history));
+      if (state.groupId) {
+        state.history.forEach(h => {
+          h.groupId = state.groupId;
+          if (!h.id.startsWith(state.groupId + '-')) {
+            h.id = `${state.groupId}-${h.id}`;
+          }
+          if (h.completedBy && !h.completedBy.startsWith(state.groupId + '-')) {
+            h.completedBy = `${state.groupId}-${h.completedBy}`;
+          }
+          if (h.taskId && !h.taskId.startsWith(state.groupId + '-')) {
+            h.taskId = `${state.groupId}-${h.taskId}`;
+          }
+        });
+      }
     }
     localStorage.setItem(`household_history${groupSuffix}`, JSON.stringify(state.history));
   }
@@ -287,7 +316,7 @@ function loadLocalState() {
 
 // Function to save local fallback state
 function saveLocalFallbackState() {
-  if (firebaseLoaded) return;
+  if (firebaseLoaded && state.groupId !== 'local-sandbox') return;
   const groupSuffix = state.groupId ? `_${state.groupId}` : '';
   localStorage.setItem(`household_group_name${groupSuffix}`, state.groupName || 'המשפחה שלי');
   localStorage.setItem(`household_users${groupSuffix}`, JSON.stringify(state.users));
@@ -296,11 +325,14 @@ function saveLocalFallbackState() {
 }
 
 let isInitialLoad = true;
-let firebaseLoaded = false;
+let firebaseLoaded = (db !== null);
 let firebaseFallbackTimer = null;
 
 function setupFirebaseListeners() {
-  if (!state.groupId) return;
+  if (!state.groupId || state.groupId === 'local-sandbox') {
+    loadFallbackLocalData();
+    return;
+  }
 
   // Listen to group metadata changes (nickname)
   db.collection('groups').doc(state.groupId).onSnapshot(doc => {
@@ -323,6 +355,7 @@ function setupFirebaseListeners() {
       const freshUser = state.users.find(u => u.id === state.currentUser.id);
       if (freshUser) {
         state.currentUser = freshUser;
+        localStorage.setItem('household_user_profile', JSON.stringify(freshUser));
       }
     }
     onStateUpdated();
@@ -334,7 +367,19 @@ function setupFirebaseListeners() {
   db.collection('tasks').where('groupId', '==', state.groupId).onSnapshot(snapshot => {
     const tasksList = [];
     snapshot.forEach(doc => {
-      tasksList.push(doc.data());
+      const taskData = doc.data();
+      // Ensure every task is assigned to a specific family member (never 'all' or empty)
+      if (!taskData.assignedTo || taskData.assignedTo === 'all') {
+        const fallbackUserId = (state.users && state.users.length > 0) ? state.users[0].id : (state.currentUser ? state.currentUser.id : '');
+        if (fallbackUserId) {
+          taskData.assignedTo = fallbackUserId;
+          // Silently sync the corrected assignee back to Firestore
+          db.collection('tasks').doc(taskData.id).set(taskData).catch(err => {
+            console.error("Auto-assign task migration failed:", err);
+          });
+        }
+      }
+      tasksList.push(taskData);
     });
     // Sort tasks by order
     tasksList.sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -363,11 +408,31 @@ function setupFirebaseListeners() {
 function updateGroupNameUI() {
   const elSubtitle = document.querySelector('.logo-section p');
   if (elSubtitle && state.groupName) {
-    elSubtitle.textContent = `מערכת המשימות והתגמולים של ${state.groupName}`;
+    elSubtitle.textContent = `קבוצה משפחתית: ${state.groupName}`;
   }
   const elNicknameInput = document.getElementById('admin-family-nickname-input');
   if (elNicknameInput && state.groupName && document.activeElement !== elNicknameInput) {
     elNicknameInput.value = state.groupName;
+  }
+
+  // Toggle header group badge and create group button
+  const elGroupBadge = document.getElementById('header-group-badge');
+  const elCreateBtn = document.getElementById('header-create-group-btn');
+  if (state.groupId && state.groupId !== 'local-sandbox') {
+    if (elGroupBadge) {
+      elGroupBadge.textContent = state.groupName || 'קבוצה פעילה';
+      elGroupBadge.style.display = 'inline-block';
+    }
+    if (elCreateBtn) {
+      elCreateBtn.style.display = 'none';
+    }
+  } else {
+    if (elGroupBadge) {
+      elGroupBadge.style.display = 'none';
+    }
+    if (elCreateBtn) {
+      elCreateBtn.style.display = 'flex';
+    }
   }
 }
 
@@ -393,10 +458,15 @@ function onStateUpdated() {
       state.currentUser = state.users.find(u => u.id === defaultMomId) || state.users[0];
     }
     
-    let activeTab = localStorage.getItem('household_active_tab') || 'tasks';
+    let activeTab = localStorage.getItem('household_active_tab') || 'home';
     if (state.currentUser.role !== 'admin' && activeTab === 'admin') {
-      activeTab = 'tasks';
-      localStorage.setItem('household_active_tab', 'tasks');
+      activeTab = 'home';
+      localStorage.setItem('household_active_tab', 'home');
+    }
+
+    const elNavTabsContainer = document.querySelector('.nav-tabs');
+    if (elNavTabsContainer) {
+      elNavTabsContainer.style.display = activeTab === 'home' ? 'none' : 'flex';
     }
 
     document.querySelectorAll('.nav-tab').forEach(t => {
@@ -419,7 +489,7 @@ function onStateUpdated() {
     populateAdminAssigneeSelect();
     populateTaskAssigneeFilter();
 
-    const defaultFilter = state.currentUser.role === 'admin' ? 'all' : 'my';
+    const defaultFilter = 'my';
     setTaskFilter(defaultFilter);
 
     setInterval(checkTaskReminders, 10000);
@@ -448,6 +518,15 @@ function onStateUpdated() {
 
     initStarRatingSelectors();
 
+    const settingsOpenFlag = localStorage.getItem('household_family_settings_open');
+    if (settingsOpenFlag === 'true') {
+      localStorage.removeItem('household_family_settings_open');
+      if (elFamilySettingsOverlay) {
+        elFamilySettingsOverlay.classList.add('active');
+        renderProfilesList();
+      }
+    }
+
     const pendingToast = localStorage.getItem('household_pending_toast');
     if (pendingToast) {
       try {
@@ -457,6 +536,17 @@ function onStateUpdated() {
         console.error(e);
       }
       localStorage.removeItem('household_pending_toast');
+    }
+
+    const pendingEmailToast = localStorage.getItem('household_pending_email_toast');
+    if (pendingEmailToast) {
+      try {
+        const { message, type } = JSON.parse(pendingEmailToast);
+        showToast(message, type);
+      } catch (e) {
+        console.error(e);
+      }
+      localStorage.removeItem('household_pending_email_toast');
     }
 
     // New Group Onboarding Banner Logic
@@ -504,6 +594,228 @@ function loadFallbackLocalData() {
 async function initApp() {
   // Debug / Reset Query Param helpers
   const urlParams = new URLSearchParams(window.location.search);
+
+  // Direct Auto-Login Routing via Invite Link
+  const groupParam = urlParams.get('group');
+  const userIdParam = urlParams.get('userId');
+  if (groupParam && userIdParam) {
+    localStorage.setItem('household_group_id', groupParam);
+    localStorage.setItem('household_current_user', userIdParam);
+    localStorage.setItem('household_visited', 'true');
+    // Clean up url params and reload
+    window.history.replaceState({}, document.title, window.location.pathname);
+    window.location.reload();
+    return;
+  }
+
+  // Setup Google Auth State Listener
+  if (auth) {
+    auth.onAuthStateChanged(async (user) => {
+      const loginBtn = document.getElementById('header-google-login-btn');
+      const signoutBtn = document.getElementById('settings-signout-btn');
+      
+      if (user) {
+        console.log("User is authenticated with Google:", user.email);
+        
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (signoutBtn) signoutBtn.style.display = 'flex';
+        
+        const googleGroupId = `group-google-${user.uid}`;
+        const currentGroupId = localStorage.getItem('household_group_id') || 'local-sandbox';
+        
+        // Check if group exists in Firestore
+        let groupExists = false;
+        if (db) {
+          try {
+            const groupDoc = await db.collection('groups').doc(googleGroupId).get();
+            if (groupDoc.exists) {
+              groupExists = true;
+            }
+          } catch (e) {
+            console.error("Error checking group existence:", e);
+          }
+        }
+        
+        if (!groupExists) {
+          // Group does not exist! Show manual creation overlay
+          const createOverlay = document.getElementById('create-google-group-overlay');
+          if (createOverlay) {
+            createOverlay.classList.add('active');
+          }
+          
+          // Bind creation form
+          const createForm = document.getElementById('create-google-group-form');
+          if (createForm) {
+            const newForm = createForm.cloneNode(true);
+            createForm.parentNode.replaceChild(newForm, createForm);
+            
+            newForm.addEventListener('submit', async (e) => {
+              e.preventDefault();
+              const groupNameInput = document.getElementById('create-google-group-name');
+              const groupName = groupNameInput ? groupNameInput.value.trim() : 'המשפחה שלי';
+              if (!groupName) return;
+              
+              const submitBtn = newForm.querySelector('button[type="submit"]');
+              if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'מקים קבוצה... ⏳';
+              }
+              
+              try {
+                // 1. Create group doc
+                await db.collection('groups').doc(googleGroupId).set({
+                  id: googleGroupId,
+                  name: groupName,
+                  createdAt: new Date().toISOString()
+                });
+                
+                // 2. Seed default users
+                const userProfile = {
+                  id: `google-user-${user.uid}`,
+                  name: user.displayName || 'אמא',
+                  role: 'admin',
+                  avatar: user.photoURL || '👩‍🦰',
+                  color: '#ec4899',
+                  balance: 0,
+                  stars: 0,
+                  groupId: googleGroupId,
+                  email: user.email || 'mom@startask.com',
+                  phone: '050-1111111'
+                };
+                // Only the current user is added to the newly created group
+                const defaultUsers = [userProfile];
+                
+                for (const u of defaultUsers) {
+                  await db.collection('users').doc(u.id).set(u);
+                }
+                
+                localStorage.setItem(`household_users_${googleGroupId}`, JSON.stringify(defaultUsers));
+                localStorage.setItem('household_user_profile', JSON.stringify(userProfile));
+                localStorage.setItem('household_current_user', userProfile.id);
+                localStorage.setItem('household_group_id', googleGroupId);
+                localStorage.setItem('household_visited', 'true');
+                
+                // Migrate local sandbox data if it has tasks
+                const localTasks = localStorage.getItem('household_tasks_local-sandbox');
+                if (localTasks && JSON.parse(localTasks).length > 0) {
+                  try {
+                    await migrateLocalDataToGroup(googleGroupId, true, groupName);
+                  } catch (migrationErr) {
+                    console.error("Migration failed:", migrationErr);
+                  }
+                } else {
+                  window.location.reload();
+                }
+              } catch (err) {
+                console.error("Group creation failed:", err);
+                showToast("הקמת הקבוצה נכשלה, נא לנסות שנית", "warning");
+                if (submitBtn) {
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = '🚀 צור קבוצה והתחל לעבוד';
+                }
+              }
+            });
+          }
+          
+          // Bind signout button
+          const signoutBtn = document.getElementById('create-google-group-signout-btn');
+          if (signoutBtn) {
+            const newSignoutBtn = signoutBtn.cloneNode(true);
+            signoutBtn.parentNode.replaceChild(newSignoutBtn, signoutBtn);
+            newSignoutBtn.addEventListener('click', async () => {
+              try {
+                await auth.signOut();
+                localStorage.setItem('household_group_id', 'local-sandbox');
+                localStorage.removeItem('household_user_profile');
+                localStorage.removeItem('household_current_user');
+                localStorage.removeItem('household_visited');
+                window.location.reload();
+              } catch (err) {
+                console.error("Signout failed:", err);
+              }
+            });
+          }
+          
+          return;
+        } else {
+          // Hide overlay if active
+          const createOverlay = document.getElementById('create-google-group-overlay');
+          if (createOverlay) {
+            createOverlay.classList.remove('active');
+          }
+        }
+        
+        if (currentGroupId !== googleGroupId) {
+          // We transitioned from sandbox or another group to this Google group
+          
+          // 1. Fetch user profile in Firestore
+          let userProfile = null;
+          if (db) {
+            try {
+              const doc = await db.collection('users').doc(`google-user-${user.uid}`).get();
+              if (doc.exists) {
+                userProfile = doc.data();
+              }
+            } catch (e) {
+              console.error("Firestore get profile error:", e);
+            }
+          }
+          
+          if (!userProfile) {
+            // Fallback (should normally exist because groupExists is true)
+            userProfile = {
+              id: `google-user-${user.uid}`,
+              name: user.displayName || 'אמא',
+              role: 'admin',
+              avatar: user.photoURL || '👩‍🦰',
+              color: '#ec4899',
+              balance: 0,
+              stars: 0,
+              groupId: googleGroupId,
+              email: user.email || 'mom@startask.com',
+              phone: '050-1111111'
+            };
+            try {
+              await db.collection('users').doc(userProfile.id).set(userProfile);
+            } catch (e) {
+              console.error("Failed to write fallback userProfile:", e);
+            }
+          }
+          
+          localStorage.setItem('household_user_profile', JSON.stringify(userProfile));
+          localStorage.setItem('household_current_user', userProfile.id);
+          localStorage.setItem('household_group_id', googleGroupId);
+          localStorage.setItem('household_visited', 'true');
+          
+          // Migrate local sandbox data if it has tasks
+          const localTasks = localStorage.getItem('household_tasks_local-sandbox');
+          if (localTasks && JSON.parse(localTasks).length > 0 && currentGroupId === 'local-sandbox') {
+            try {
+              await migrateLocalDataToGroup(googleGroupId, true, userProfile.name + ' שלי');
+            } catch (e) {
+              console.error("Migration failed:", e);
+            }
+          } else {
+            window.location.reload();
+          }
+        }
+      } else {
+        // User is signed out
+        if (loginBtn) loginBtn.style.display = 'flex';
+        if (signoutBtn) signoutBtn.style.display = 'none';
+        
+        const currentGroupId = localStorage.getItem('household_group_id') || 'local-sandbox';
+        if (currentGroupId.startsWith('group-google-')) {
+          // Token expired or logged out externally
+          localStorage.setItem('household_group_id', 'local-sandbox');
+          localStorage.removeItem('household_user_profile');
+          localStorage.removeItem('household_current_user');
+          localStorage.removeItem('household_visited');
+          window.location.reload();
+        }
+      }
+    });
+  }
   if (urlParams.has('reset') || urlParams.has('first')) {
     const currentGroupId = localStorage.getItem('household_group_id');
     localStorage.removeItem('household_visited');
@@ -513,6 +825,7 @@ async function initApp() {
     localStorage.removeItem('household_users');
     localStorage.removeItem('household_tasks');
     localStorage.removeItem('household_history');
+    localStorage.removeItem('household_user_profile');
     if (currentGroupId) {
       localStorage.removeItem(`household_users_${currentGroupId}`);
       localStorage.removeItem(`household_tasks_${currentGroupId}`);
@@ -520,7 +833,7 @@ async function initApp() {
     }
     localStorage.removeItem('household_group_id');
     
-    if (currentGroupId) {
+    if (currentGroupId && currentGroupId !== 'local-sandbox' && db) {
       try {
         const usersSnap = await db.collection('users').where('groupId', '==', currentGroupId).get();
         const userDeletes = [];
@@ -546,243 +859,127 @@ async function initApp() {
     return;
   }
 
-  // Legacy Migration Check
-  const legacyUsers = localStorage.getItem('household_users');
-  if (legacyUsers && !urlParams.has('join') && !urlParams.has('reset')) {
-    let targetGroupId = localStorage.getItem('household_group_id');
-    if (!targetGroupId) {
-      targetGroupId = `family-${Math.floor(10000 + Math.random() * 90000)}`;
-      localStorage.setItem('household_group_id', targetGroupId);
-    }
-    state.groupId = targetGroupId;
-    
-    try {
-      // 1. Delete any automatically seeded data in this group to avoid mixing
-      const usersSnap = await db.collection('users').where('groupId', '==', targetGroupId).get();
-      const userDeletes = [];
-      usersSnap.forEach(doc => userDeletes.push(doc.ref.delete()));
-      
-      const tasksSnap = await db.collection('tasks').where('groupId', '==', targetGroupId).get();
-      const taskDeletes = [];
-      tasksSnap.forEach(doc => taskDeletes.push(doc.ref.delete()));
-      
-      const historySnap = await db.collection('history').where('groupId', '==', targetGroupId).get();
-      const historyDeletes = [];
-      historySnap.forEach(doc => historyDeletes.push(doc.ref.delete()));
-      
-      await Promise.all([...userDeletes, ...taskDeletes, ...historyDeletes]);
-      
-      // 2. Migrate Users
-      const parsedUsers = JSON.parse(legacyUsers);
-      const userPromises = parsedUsers.map(u => {
-        const uCopy = {
-          ...u,
-          id: `${targetGroupId}-${u.id}`,
-          groupId: targetGroupId
-        };
-        // Update current user mapping if it matches
-        const savedCurrentUser = localStorage.getItem('household_current_user');
-        if (savedCurrentUser === u.id || savedCurrentUser === `${targetGroupId}-${u.id}`) {
-          localStorage.setItem('household_current_user', uCopy.id);
-        }
-        return db.collection('users').doc(uCopy.id).set(uCopy);
-      });
-      
-      // 3. Migrate Tasks
-      const legacyTasks = localStorage.getItem('household_tasks');
-      const parsedTasks = legacyTasks ? JSON.parse(legacyTasks) : [];
-      const taskPromises = parsedTasks.map(t => {
-        const tCopy = {
-          ...t,
-          id: `${targetGroupId}-${t.id}`,
-          groupId: targetGroupId
-        };
-        if (tCopy.assignedTo && tCopy.assignedTo !== 'all') {
-          tCopy.assignedTo = `${targetGroupId}-${tCopy.assignedTo}`;
-        }
-        if (tCopy.completedBy) {
-          tCopy.completedBy = `${targetGroupId}-${tCopy.completedBy}`;
-        }
-        return db.collection('tasks').doc(tCopy.id).set(tCopy);
-      });
-      
-      // 4. Migrate History
-      const legacyHistory = localStorage.getItem('household_history');
-      const parsedHistory = legacyHistory ? JSON.parse(legacyHistory) : [];
-      const historyPromises = parsedHistory.map(h => {
-        const hCopy = {
-          ...h,
-          id: `${targetGroupId}-${h.id}`,
-          groupId: targetGroupId
-        };
-        if (hCopy.completedBy) {
-          hCopy.completedBy = `${targetGroupId}-${hCopy.completedBy}`;
-        }
-        if (hCopy.taskId) {
-          hCopy.taskId = `${targetGroupId}-${hCopy.taskId}`;
-        }
-        return db.collection('history').doc(hCopy.id).set(hCopy);
-      });
-      
-      await Promise.all([...userPromises, ...taskPromises, ...historyPromises]);
-      
-      // Save to group-prefixed localStorage keys
-      localStorage.setItem(`household_users_${targetGroupId}`, JSON.stringify(parsedUsers.map(u => ({ ...u, id: `${targetGroupId}-${u.id}`, groupId: targetGroupId }))));
-      localStorage.setItem(`household_tasks_${targetGroupId}`, JSON.stringify(parsedTasks.map(t => ({ ...t, id: `${targetGroupId}-${t.id}`, groupId: targetGroupId, assignedTo: t.assignedTo && t.assignedTo !== 'all' ? `${targetGroupId}-${t.assignedTo}` : t.assignedTo, completedBy: t.completedBy ? `${targetGroupId}-${t.completedBy}` : t.completedBy }))));
-      localStorage.setItem(`household_history_${targetGroupId}`, JSON.stringify(parsedHistory.map(h => ({ ...h, id: `${targetGroupId}-${h.id}`, groupId: targetGroupId, completedBy: h.completedBy ? `${targetGroupId}-${h.completedBy}` : h.completedBy, taskId: h.taskId ? `${targetGroupId}-${h.taskId}` : h.taskId }))));
-      
-      // Clear legacy localStorage keys to complete migration
-      localStorage.removeItem('household_users');
-      localStorage.removeItem('household_tasks');
-      localStorage.removeItem('household_history');
-      
-      localStorage.setItem('household_visited', 'true');
-      
-      // If the current user doesn't exist in the migrated users, set to the first migrated user
-      const savedCurrentUser = localStorage.getItem('household_current_user');
-      const userExists = parsedUsers.some(u => `${targetGroupId}-${u.id}` === savedCurrentUser || u.id === savedCurrentUser);
-      if (!userExists && parsedUsers.length > 0) {
-        localStorage.setItem('household_current_user', `${targetGroupId}-${parsedUsers[0].id}`);
-      }
-      
-      localStorage.setItem('household_pending_toast', JSON.stringify({
-        message: `משפחתך הועברה בהצלחה לקבוצה: ${targetGroupId}! 🎉`,
-        type: 'success'
-      }));
-      
-      window.location.reload();
-      return;
-    } catch (err) {
-      console.error("Legacy migration failed:", err);
-    }
-  }
-
-  // Check if group ID exists
-  let groupId = localStorage.getItem('household_group_id');
+  // Onboarding Profile Wizard Check
+  const savedProfile = localStorage.getItem('household_user_profile');
   
-  // If groupId query parameter exists, prioritize it and save it
-  const groupParam = urlParams.get('group');
-  if (groupParam) {
-    localStorage.setItem('household_group_id', groupParam);
-    groupId = groupParam;
+  if (!savedProfile) {
+    // FIRST ENTRY (Bypassing wizard entirely):
+    const defaultMom = {
+      id: 'user-mom',
+      name: 'אמא',
+      role: 'admin',
+      avatar: '👩‍🦰',
+      color: '#ec4899',
+      balance: 0,
+      stars: 0,
+      groupId: 'local-sandbox',
+      email: 'mom@startask.com',
+      phone: '050-1111111'
+    };
+    
+    const defaultUsers = [
+      defaultMom,
+      { id: 'user-dad', name: 'אבא', role: 'admin', avatar: '👨‍🦱', color: '#3b82f6', balance: 0, stars: 0, groupId: 'local-sandbox', email: 'dad@startask.com', phone: '050-2222222' },
+      { id: 'user-kid1', name: 'ילד 1', role: 'member', avatar: '👦', color: '#10b981', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' },
+      { id: 'user-kid2', name: 'ילד 2', role: 'member', avatar: '👧', color: '#f59e0b', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' }
+    ];
+    
+    localStorage.setItem('household_users_local-sandbox', JSON.stringify(defaultUsers));
+    localStorage.setItem('household_user_profile', JSON.stringify(defaultMom));
+    localStorage.setItem('household_current_user', 'user-mom');
+    localStorage.setItem('household_group_id', 'local-sandbox');
+    localStorage.setItem('household_visited', 'true');
+    localStorage.setItem('household_active_tab', 'home');
+    
+    state.groupId = 'local-sandbox';
+    state.currentUser = defaultMom;
+    state.users = defaultUsers;
+    
+    // Hide standard overlays
+    const welcomeOverlay = document.getElementById('welcome-overlay');
+    if (welcomeOverlay) welcomeOverlay.classList.remove('active');
+    
+    const groupSetupOverlay = document.getElementById('group-setup-overlay');
+    if (groupSetupOverlay) groupSetupOverlay.classList.remove('active');
+    
+    // Ensure onboarding wizard overlay is hidden
+    const onboardingOverlay = document.getElementById('onboarding-wizard-overlay');
+    if (onboardingOverlay) onboardingOverlay.style.display = 'none';
+    
+    // Initialize Theme Selector
+    initThemeSelector();
+    
+    // Load local state & bind basic events
+    loadLocalState();
+    bindEvents();
+    
+    // Bind group setup handlers for banner/settings
+    initGroupSetupHandlers();
+    
+    isInitialLoad = true;
+    onStateUpdated();
+    return;
+  }
+  
+  // SECOND ENTRY (Recognized)
+  let groupId = localStorage.getItem('household_group_id') || 'local-sandbox';
+  state.groupId = groupId;
+  
+  // If groupId query parameter exists, prioritize it (unless it is already set to something real)
+  const queryGroupParam = urlParams.get('group');
+  if (queryGroupParam && groupId === 'local-sandbox') {
+    localStorage.setItem('household_group_id', queryGroupParam);
+    groupId = queryGroupParam;
+    state.groupId = queryGroupParam;
   }
 
-  state.groupId = groupId;
+  // Load the user profile
+  const profile = JSON.parse(savedProfile);
+  
+  // Initialize Theme Selector
+  initThemeSelector();
+  
+  // Hide group setup overlay by default
+  const groupSetupOverlay = document.getElementById('group-setup-overlay');
+  if (groupSetupOverlay) {
+    groupSetupOverlay.classList.remove('active');
+  }
 
+  if (state.groupId === 'local-sandbox') {
+    // Load local sandbox
+    const localUsersStr = localStorage.getItem('household_users_local-sandbox');
+    if (localUsersStr) {
+      state.users = JSON.parse(localUsersStr);
+    } else {
+      state.users = [profile];
+    }
+    
+    const savedCurrentUser = localStorage.getItem('household_current_user');
+    state.currentUser = state.users.find(u => u.id === savedCurrentUser) || state.users[0] || profile;
+    
+    loadLocalState();
+    bindEvents();
+    
+    // Bind group setup handlers for banner/settings
+    initGroupSetupHandlers();
+    
+    isInitialLoad = true;
+    onStateUpdated();
+    return;
+  }
+  
+  // CLOUD MODE
   if (urlParams.has('join')) {
-    // Show join overlay
     const joinOverlay = document.getElementById('join-family-overlay');
     if (joinOverlay) {
       joinOverlay.classList.add('active');
       initJoinAvatarPicker();
       setupJoinFormHandlers();
     }
-    return; // Stop app initialization
+    return;
   }
-
-  if (!groupId) {
-    // Show group setup overlay
-    const groupSetupOverlay = document.getElementById('group-setup-overlay');
-    if (groupSetupOverlay) {
-      groupSetupOverlay.classList.add('active');
-    }
-    
-    // Bind group setup buttons
-    const btnCreateNewGroup = document.getElementById('btn-create-new-group');
-    if (btnCreateNewGroup) {
-      btnCreateNewGroup.addEventListener('click', async () => {
-        const inputGroupName = document.getElementById('input-group-name');
-        const groupName = (inputGroupName && inputGroupName.value.trim()) ? inputGroupName.value.trim() : 'המשפחה שלי';
-
-        // Generate a random group code, e.g., family-38492
-        const randomCode = `family-${Math.floor(10000 + Math.random() * 90000)}`;
-        localStorage.setItem('household_group_id', randomCode);
-        state.groupId = randomCode;
-        state.groupName = groupName;
-        
-        // Seed database immediately for this group
-        try {
-          // Save group metadata
-          await db.collection('groups').doc(randomCode).set({
-            id: randomCode,
-            name: groupName,
-            createdAt: new Date().toISOString()
-          });
-          
-          await seedDatabaseIfEmpty(randomCode);
-        } catch (e) {
-          console.error("Failed to seed new group:", e);
-        }
-        
-        // Save nickname locally for fallback
-        localStorage.setItem(`household_group_name_${randomCode}`, groupName);
-
-        // Set default current user to Mom (prefixed)
-        localStorage.setItem('household_current_user', `${randomCode}-user-mom`);
-        localStorage.setItem('household_visited', 'true');
-        
-        // Redirect to tasks tab by default for profile updates and open settings modal
-        localStorage.setItem('household_active_tab', 'tasks');
-        localStorage.setItem('household_new_group_onboarding', 'true');
-        
-        localStorage.setItem('household_pending_toast', JSON.stringify({
-          message: `הקבוצה "${groupName}" הוקמה בהצלחה! 🎉`,
-          type: 'success'
-        }));
-        
-        // Reload to start fresh under this group
-        window.location.reload();
-      });
-    }
-    
-    const btnJoinGroupCode = document.getElementById('btn-join-group-code');
-    const inputGroupCode = document.getElementById('input-group-code');
-    if (btnJoinGroupCode && inputGroupCode) {
-      btnJoinGroupCode.addEventListener('click', () => {
-        const enteredCode = inputGroupCode.value.trim();
-        if (!enteredCode) {
-          showToast('אנא הכנס קוד משפחה תקין', 'warning');
-          return;
-        }
-        
-        localStorage.setItem('household_group_id', enteredCode);
-        localStorage.setItem('household_visited', 'true');
-        
-        localStorage.setItem('household_pending_toast', JSON.stringify({
-          message: `הצטרפת לקבוצה ${enteredCode} בהצלחה! 🏠`,
-          type: 'success'
-        }));
-        
-        window.location.reload();
-      });
-    }
-    
-    return; // Stop app initialization until group is set
-  }
-
-  // Hide group setup overlay if it was open
-  const groupSetupOverlay = document.getElementById('group-setup-overlay');
-  if (groupSetupOverlay) {
-    groupSetupOverlay.classList.remove('active');
-  }
-
-  // Initialize Theme Selector
-  initThemeSelector();
-
-  // Show welcome overlay on first visit
-  const isFirstVisit = !localStorage.getItem('household_visited');
-  if (isFirstVisit) {
-    const elWelcomeOverlay = document.getElementById('welcome-overlay');
-    const elWelcomeCloseBtn = document.getElementById('welcome-close-btn');
-    if (elWelcomeOverlay && elWelcomeCloseBtn) {
-      elWelcomeOverlay.classList.add('active');
-      elWelcomeCloseBtn.addEventListener('click', () => {
-        elWelcomeOverlay.classList.remove('active');
-        localStorage.setItem('household_visited', 'true');
-      });
-    }
-  }
-
+  
+  // Normal Firebase initialization for cloud group
   // Set a fallback timer for 4 seconds to detect Firebase hanging
   firebaseFallbackTimer = setTimeout(() => {
     if (!firebaseLoaded) {
@@ -796,16 +993,14 @@ async function initApp() {
     // Seed initial mock data in Firestore if empty for this group
     await seedDatabaseIfEmpty(state.groupId);
 
-    // Bind events (must run once)
+    // Bind events
     bindEvents();
 
-    // Setup Firebase real-time listeners (this handles loading the data and rendering)
+    // Setup Firebase real-time listeners
     setupFirebaseListeners();
   } catch (error) {
     console.error("Failed to initialize Firebase App:", error);
     showFirebaseErrorAlert("אתחול האפליקציה", error);
-    
-    // Fallback: If Firebase fails, load using the local mock data
     loadFallbackLocalData();
   }
 }
@@ -1115,7 +1310,7 @@ function setTaskFilter(filterName) {
 
   if (elTaskAssigneeFilter) {
     if (filterName === 'my') {
-      elTaskAssigneeFilter.value = state.currentUser.id;
+      elTaskAssigneeFilter.value = state.currentUser ? state.currentUser.id : '';
     } else {
       elTaskAssigneeFilter.value = 'any';
     }
@@ -1134,9 +1329,14 @@ function setTaskFilter(filterName) {
 
 function showToast(message, type = 'info') {
   const toast = document.createElement('div');
-  toast.className = `toast ${type === 'success' ? 'success' : ''}`;
+  toast.className = `toast ${type}`;
+  let icon = 'ℹ️';
+  if (type === 'success') icon = '✨';
+  else if (type === 'email') icon = '📧';
+  else if (type === 'warning') icon = '⚠️';
+  
   toast.innerHTML = `
-    <span>${type === 'success' ? '✨' : 'ℹ️'}</span>
+    <span>${icon}</span>
     <span>${message}</span>
   `;
   elToastContainer.appendChild(toast);
@@ -1153,18 +1353,9 @@ function updateProfileUI() {
   if (!state.currentUser) return;
   elActiveAvatar.innerHTML = getAvatarHTML(state.currentUser.avatar);
   elActiveName.textContent = state.currentUser.name;
-  elActiveRole.textContent = state.currentUser.role === 'admin' ? 'הורה (מנהל)' : 'משתתף';
+  elActiveRole.textContent = state.currentUser.role === 'admin' ? 'הורה' : 'ילד';
   if (elActiveBalance) {
     elActiveBalance.textContent = `₪${state.currentUser.balance}`;
-  }
-
-  const elHeaderCashVal = document.getElementById('header-cash-val');
-  if (elHeaderCashVal) {
-    elHeaderCashVal.textContent = `₪${state.currentUser.balance}`;
-  }
-  const elHeaderStarsVal = document.getElementById('header-stars-val');
-  if (elHeaderStarsVal) {
-    elHeaderStarsVal.textContent = `⭐ ${state.currentUser.stars || 0}`;
   }
 
   // Highlight active user and update active balance indicator in dashboard
@@ -1176,34 +1367,35 @@ function updateProfileUI() {
     elHeaderAdminGearBtn.style.display = 'flex';
   }
 
-  // Toggle Navigation Add Task button for all family members
-  const elNavAddTaskBtn = document.getElementById('nav-add-task-btn');
-  if (elNavAddTaskBtn) {
-    elNavAddTaskBtn.style.display = 'flex';
-  }
+  // Navigation Add Task button removed
 
-  // Toggle admin dashboard in-context add task button
+  // Toggle admin dashboard in-context add task button for all family members
   const elAdminAddTaskBtn = document.getElementById('admin-add-task-btn');
   if (elAdminAddTaskBtn) {
-    if (state.currentUser.role === 'admin') {
-      elAdminAddTaskBtn.style.display = 'flex';
-    } else {
-      elAdminAddTaskBtn.style.display = 'none';
-    }
+    elAdminAddTaskBtn.style.display = 'flex';
   }
 
-  // Toggle share invite button for parents
-  const elAdminShareInviteBtn = document.getElementById('admin-share-invite-btn');
-  if (elAdminShareInviteBtn) {
-    if (state.currentUser.role === 'admin') {
-      elAdminShareInviteBtn.style.display = 'flex';
-    } else {
-      elAdminShareInviteBtn.style.display = 'none';
-    }
+  // local-sync-banner removed
+
+  // Toggle Settings code display based on sandbox mode
+  const elSettingsCodeRow = document.getElementById('settings-code-row');
+  const elSettingsNicknameDisplay = document.getElementById('admin-family-nickname-display');
+  if (state.groupId === 'local-sandbox') {
+    if (elSettingsCodeRow) elSettingsCodeRow.style.display = 'none';
+    if (elSettingsNicknameDisplay) elSettingsNicknameDisplay.style.display = 'flex';
+  } else {
+    if (elSettingsCodeRow) elSettingsCodeRow.style.display = 'flex';
+    if (elSettingsNicknameDisplay) elSettingsNicknameDisplay.style.display = 'flex';
   }
 }
 
 function switchTab(targetTab) {
+  // Toggle nav-tabs visibility based on tab
+  const elNavTabsContainer = document.querySelector('.nav-tabs');
+  if (elNavTabsContainer) {
+    elNavTabsContainer.style.display = targetTab === 'home' ? 'none' : 'flex';
+  }
+
   // Update Tab class
   elNavTabs.forEach(t => {
     if (t.getAttribute('data-tab') === targetTab) {
@@ -1235,6 +1427,17 @@ function switchTab(targetTab) {
 }
 
 function bindEvents() {
+  // Google Sign-In and Sign-Out event listeners
+  const elGoogleLoginBtn = document.getElementById('header-google-login-btn');
+  if (elGoogleLoginBtn) {
+    elGoogleLoginBtn.addEventListener('click', loginWithGoogle);
+  }
+
+  const elGoogleSignoutBtn = document.getElementById('settings-signout-btn');
+  if (elGoogleSignoutBtn) {
+    elGoogleSignoutBtn.addEventListener('click', signOutUser);
+  }
+
   // Header Admin Settings Gear click - opens the Settings Modal
   const elGearBtn = document.getElementById('header-admin-gear-btn');
   if (elGearBtn && elFamilySettingsOverlay) {
@@ -1258,11 +1461,6 @@ function bindEvents() {
   // Settings Modal Close
   if (elFamilySettingsCloseBtn && elFamilySettingsOverlay) {
     elFamilySettingsCloseBtn.addEventListener('click', closeSettingsModal);
-    elFamilySettingsOverlay.addEventListener('click', (e) => {
-      if (e.target === elFamilySettingsOverlay) {
-        closeSettingsModal();
-      }
-    });
   }
 
   const elFamilySettingsFinishBtn = document.getElementById('family-settings-finish-btn');
@@ -1340,12 +1538,18 @@ function bindEvents() {
         return;
       }
       
+      if (state.groupId === 'local-sandbox') {
+        const randomCode = `family-${Math.floor(10000 + Math.random() * 90000)}`;
+        await migrateLocalDataToGroup(randomCode, true, newNickname);
+        return;
+      }
+
       state.groupName = newNickname;
       
       // Update locally for fallback
       const groupSuffix = state.groupId ? `_${state.groupId}` : '';
       localStorage.setItem(`household_group_name${groupSuffix}`, newNickname);
-      
+
       // Update in Firestore
       try {
         await db.collection('groups').doc(state.groupId).set({
@@ -1368,7 +1572,7 @@ function bindEvents() {
   if (elAdminShareInviteBtn) {
     elAdminShareInviteBtn.addEventListener('click', () => {
       const inviteLink = window.location.origin + window.location.pathname + `?join=true&group=${state.groupId}`;
-      const msg = `היי! אני מזמין אותך להצטרף לניהול משימות הבית המשפחתי ב-CleanHome. לחץ/י על הקישור הבא כדי להתחבר: ${inviteLink}`;
+      const msg = `היי! אני מזמין אותך להצטרף לניהול משימות הבית המשפחתי ב-StarTask. לחץ/י על הקישור הבא כדי להתחבר: ${inviteLink}`;
       
       // Try to copy link to clipboard first
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1488,7 +1692,6 @@ function bindEvents() {
   }
 
   // Open Create Task Modal
-  const elNavAddTaskBtn = document.getElementById('nav-add-task-btn');
   const elAdminAddTaskBtn = document.getElementById('admin-add-task-btn');
   const elCreateTaskOverlay = document.getElementById('create-task-overlay');
   const elCreateTaskCloseBtn = document.getElementById('create-task-close-btn');
@@ -1512,9 +1715,6 @@ function bindEvents() {
     }
   };
 
-  if (elNavAddTaskBtn) {
-    elNavAddTaskBtn.addEventListener('click', openCreateTaskModal);
-  }
   if (elAdminAddTaskBtn) {
     elAdminAddTaskBtn.addEventListener('click', openCreateTaskModal);
   }
@@ -1578,36 +1778,49 @@ function bindEvents() {
   }
 
   // Watch Payment Type changing in form
-  document.getElementById('admin-payment-type').addEventListener('change', (e) => {
-    const value = e.target.value;
-    const rewardGroup = document.getElementById('reward-amount-group');
-    const starsGroup = document.getElementById('reward-stars-group');
-    if (value === 'paid') {
-      rewardGroup.style.display = 'block';
-      if (starsGroup) starsGroup.style.display = 'none';
-      window.setStarRatingValue('create-star-rating', 'admin-reward-stars', 0);
-    } else {
-      rewardGroup.style.display = 'none';
-      document.getElementById('admin-reward').value = '0';
-      if (starsGroup) starsGroup.style.display = 'block';
-      window.setStarRatingValue('create-star-rating', 'admin-reward-stars', 1);
-    }
-  });
+  const elPaymentType = document.getElementById('admin-payment-type');
+  if (elPaymentType) {
+    elPaymentType.addEventListener('change', (e) => {
+      const value = e.target.value;
+      const rewardGroup = document.getElementById('reward-amount-group');
+      const starsGroup = document.getElementById('reward-stars-group');
+      if (value === 'paid') {
+        if (rewardGroup) rewardGroup.style.display = 'block';
+        if (starsGroup) starsGroup.style.display = 'none';
+        window.setStarRatingValue('create-star-rating', 'admin-reward-stars', 0);
+      } else {
+        if (rewardGroup) rewardGroup.style.display = 'none';
+        const elReward = document.getElementById('admin-reward');
+        if (elReward) elReward.value = '0';
+        if (starsGroup) starsGroup.style.display = 'block';
+        window.setStarRatingValue('create-star-rating', 'admin-reward-stars', 1);
+      }
+    });
+  }
 
   // Watch isRecurring checkbox in form
-  document.getElementById('admin-is-recurring').addEventListener('change', (e) => {
-    const isChecked = e.target.checked;
-    document.getElementById('recurring-config-group').style.display = isChecked ? 'block' : 'none';
-  });
+  const elIsRecurring = document.getElementById('admin-is-recurring');
+  if (elIsRecurring) {
+    elIsRecurring.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      const elRecGroup = document.getElementById('recurring-config-group');
+      if (elRecGroup) elRecGroup.style.display = isChecked ? 'block' : 'none';
+    });
+  }
 
   // Watch hasReminder checkbox in form
-  document.getElementById('admin-has-reminder').addEventListener('change', (e) => {
-    const isChecked = e.target.checked;
-    document.getElementById('reminder-config-group').style.display = isChecked ? 'block' : 'none';
-  });
+  const elHasReminder = document.getElementById('admin-has-reminder');
+  if (elHasReminder) {
+    elHasReminder.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      const elRemGroup = document.getElementById('reminder-config-group');
+      if (elRemGroup) elRemGroup.style.display = isChecked ? 'block' : 'none';
+    });
+  }
 
   // Admin New Task Form submit
-  elAdminForm.addEventListener('submit', async (e) => {
+  if (elAdminForm) {
+    elAdminForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     // Get form values
@@ -1705,6 +1918,22 @@ function bindEvents() {
       timestamp: new Date().toISOString()
     };
     
+    if (state.groupId === 'local-sandbox') {
+      state.tasks.push(newTask);
+      state.history.push(historyEntry);
+      saveState();
+      const elCreateTaskOverlay = document.getElementById('create-task-overlay');
+      if (elCreateTaskOverlay) {
+        elCreateTaskOverlay.classList.remove('active');
+      }
+      localStorage.setItem('household_pending_toast', JSON.stringify({
+        message: `המשימה "${title}" נוצרה בהצלחה!`,
+        type: 'success'
+      }));
+      window.location.reload();
+      return;
+    }
+
     try {
       await db.collection('tasks').doc(newTask.id).set(newTask);
       await db.collection('history').doc(historyId).set(historyEntry);
@@ -1725,6 +1954,7 @@ function bindEvents() {
     }));
     window.location.reload();
   });
+}
 
   // Profile Management - Add Profile
   if (elAdminAddProfileForm) {
@@ -1734,6 +1964,8 @@ function bindEvents() {
       const avatar = document.getElementById('admin-new-profile-avatar').value;
       const role = document.getElementById('admin-new-profile-role').value;
       const color = document.getElementById('admin-new-profile-color').value;
+      const email = document.getElementById('admin-new-profile-email').value.trim();
+      const phone = document.getElementById('admin-new-profile-phone').value.trim();
 
       if (!name) return;
 
@@ -1745,8 +1977,33 @@ function bindEvents() {
         avatar,
         color,
         balance: 0,
-        stars: 0
+        stars: 0,
+        email,
+        phone
       };
+
+      if (state.groupId === 'local-sandbox') {
+        state.users.push(newUser);
+        saveState();
+        elAdminAddProfileForm.reset();
+        document.getElementById('admin-new-profile-color').value = '#8b5cf6';
+        selectAvatarOption('admin-new', '👧');
+        if (elAdminAddProfileForm) {
+          elAdminAddProfileForm.style.display = 'none';
+        }
+        const elToggleAddProfileBtn = document.getElementById('toggle-add-profile-btn');
+        if (elToggleAddProfileBtn) {
+          elToggleAddProfileBtn.innerHTML = '➕ הוספת בן משפחה חדש';
+          elToggleAddProfileBtn.style.borderStyle = 'dashed';
+        }
+        const elFamilySettingsFinishBtn = document.getElementById('family-settings-finish-btn');
+        if (elFamilySettingsFinishBtn) {
+          elFamilySettingsFinishBtn.style.display = 'block';
+        }
+        renderAdminPanel();
+        showToast('בן משפחה נוסף בהצלחה!', 'success');
+        return;
+      }
 
       try {
         await db.collection('users').doc(newUser.id).set(newUser);
@@ -1796,6 +2053,8 @@ function bindEvents() {
       const avatar = document.getElementById('admin-edit-profile-avatar').value;
       const role = document.getElementById('admin-edit-profile-role').value;
       const color = document.getElementById('admin-edit-profile-color').value;
+      const email = document.getElementById('admin-edit-profile-email').value.trim();
+      const phone = document.getElementById('admin-edit-profile-phone').value.trim();
 
       if (!name) return;
 
@@ -1807,8 +2066,30 @@ function bindEvents() {
           name,
           avatar,
           role,
-          color
+          color,
+          email,
+          phone
         };
+        if (state.groupId === 'local-sandbox') {
+          const idx = state.users.findIndex(u => u.id === id);
+          if (idx !== -1) {
+            state.users[idx] = updatedUser;
+          }
+          if (state.currentUser.id === id) {
+            state.currentUser = updatedUser;
+            localStorage.setItem('household_user_profile', JSON.stringify(updatedUser));
+          }
+          saveState();
+          elEditProfileOverlay.classList.remove('active');
+          localStorage.setItem('household_pending_toast', JSON.stringify({
+            message: 'הפרופיל עודכן בהצלחה!',
+            type: 'success'
+          }));
+          localStorage.setItem('household_family_settings_open', 'true');
+          window.location.reload();
+          return;
+        }
+
         try {
           await db.collection('users').doc(id).set(updatedUser);
         } catch (err) {
@@ -1826,6 +2107,7 @@ function bindEvents() {
           message: 'הפרופיל עודכן בהצלחה!',
           type: 'success'
         }));
+        localStorage.setItem('household_family_settings_open', 'true');
         window.location.reload();
       }
     });
@@ -1837,6 +2119,58 @@ function bindEvents() {
       document.querySelectorAll('.calendar-dropdown').forEach(d => d.classList.remove('active'));
     }
   });
+
+  // Card 1: Add Task
+  const elMenuCardAddTask = document.getElementById('menu-card-add-task');
+  if (elMenuCardAddTask) {
+    elMenuCardAddTask.addEventListener('click', openCreateTaskModal);
+  }
+
+  // Card 2: Tasks
+  const elMenuCardTasks = document.getElementById('menu-card-tasks');
+  if (elMenuCardTasks) {
+    elMenuCardTasks.addEventListener('click', () => {
+      switchTab('tasks');
+    });
+  }
+
+  // Card: Dashboard
+  const elMenuCardDashboard = document.getElementById('menu-card-dashboard');
+  if (elMenuCardDashboard) {
+    elMenuCardDashboard.addEventListener('click', () => {
+      switchTab('dashboard');
+    });
+  }
+
+  // Create Task button on Family Tasks page
+  const elBtnCreateTaskOnTasksPage = document.getElementById('btn-create-task-on-tasks-page');
+  if (elBtnCreateTaskOnTasksPage) {
+    elBtnCreateTaskOnTasksPage.addEventListener('click', openCreateTaskModal);
+  }
+
+  // Card 3: Settings
+  const elMenuCardSettings = document.getElementById('menu-card-settings');
+  if (elMenuCardSettings && elFamilySettingsOverlay) {
+    elMenuCardSettings.addEventListener('click', () => {
+      elFamilySettingsOverlay.classList.add('active');
+      renderProfilesList();
+    });
+  }
+
+  // Back to home buttons
+  const elBtnBackToHome = document.getElementById('btn-back-to-home');
+  if (elBtnBackToHome) {
+    elBtnBackToHome.addEventListener('click', () => {
+      switchTab('home');
+    });
+  }
+
+  const elBtnDashboardBackToHome = document.getElementById('btn-dashboard-back-to-home');
+  if (elBtnDashboardBackToHome) {
+    elBtnDashboardBackToHome.addEventListener('click', () => {
+      switchTab('home');
+    });
+  }
 }
 
 // User Picker logic
@@ -1882,33 +2216,37 @@ function selectUser(userId) {
     saveState();
     updateProfileUI();
 
-    // Adjust filter based on role
-    const defaultFilter = user.role === 'admin' ? 'all' : 'my';
+    // Set default filter to 'my'
+    const defaultFilter = 'my';
     setTaskFilter(defaultFilter);
 
-    // If the new active user is not an admin, redirect them from the admin tab to the tasks tab and close settings modal
+    // If the new active user is not an admin, redirect them from the admin tab to the home tab and close settings modal
     if (user.role !== 'admin') {
       if (elFamilySettingsOverlay) {
         elFamilySettingsOverlay.classList.remove('active');
       }
-      const activeTab = localStorage.getItem('household_active_tab') || 'tasks';
+      const activeTab = localStorage.getItem('household_active_tab') || 'home';
       if (activeTab === 'admin') {
-        localStorage.setItem('household_active_tab', 'tasks');
+        localStorage.setItem('household_active_tab', 'home');
         // Update nav tabs active classes
         document.querySelectorAll('.nav-tab').forEach(t => {
-          if (t.getAttribute('data-tab') === 'tasks') {
+          if (t.getAttribute('data-tab') === 'home') {
             t.classList.add('active');
           } else {
             t.classList.remove('active');
           }
         });
         document.querySelectorAll('.tab-content').forEach(panel => {
-          if (panel.id === 'tasks-tab-content') {
+          if (panel.id === 'home-tab-content') {
             panel.classList.add('active');
           } else {
             panel.classList.remove('active');
           }
         });
+        const elNavTabsContainer = document.querySelector('.nav-tabs');
+        if (elNavTabsContainer) {
+          elNavTabsContainer.style.display = 'none';
+        }
       }
     }
     
@@ -1987,6 +2325,10 @@ function renderDashboard() {
         badgeHTML = `<span class="task-badge status-completed" style="background: rgba(244, 63, 94, 0.1); color: #f87171; border: 1px solid rgba(244, 63, 94, 0.2);">🗑️ נמחקה</span>`;
         priceHTML = ``;
         itemStyle = `opacity: 0.65; border-style: dashed;`;
+      } else if (action === 'email-sent') {
+        badgeHTML = `<span class="task-badge status-email">📧 מייל נשלח</span>`;
+        priceHTML = ``;
+        itemStyle = `border-right: 4px solid #3b82f6;`;
       } else { // completed
         badgeHTML = `<span class="task-badge status-completed" style="background: rgba(16, 185, 129, 0.1); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2);">✅ בוצע</span>`;
         if (item.reward > 0) {
@@ -2086,7 +2428,7 @@ function populateTaskAssigneeFilter() {
   const currentVal = elTaskAssigneeFilter.value || 'any';
   
   elTaskAssigneeFilter.innerHTML = `
-    <option value="any">🔎 כל המשימות</option>
+    <option value="any">👥 כל בני הבית</option>
   `;
   
   state.users.forEach(u => {
@@ -2121,8 +2463,34 @@ function renderTasks() {
     }
   }
 
+  // Update custom assignee filter icon/avatar and title dynamically
+  const elBtnIcon = document.getElementById('filter-btn-icon');
+  const elBtn = document.getElementById('filter-icon-btn');
+  if (elTaskAssigneeFilter && elBtnIcon && elBtn) {
+    const val = elTaskAssigneeFilter.value || 'any';
+    if (val === 'any') {
+      elBtnIcon.textContent = '👥'; // Default filter icon
+      elBtn.style.background = 'rgba(255, 255, 255, 0.03)';
+      elBtn.style.borderColor = 'var(--border-color)';
+      elBtn.title = 'סנן לפי בן משפחה';
+    } else {
+      const user = state.users.find(u => u.id === val);
+      if (user) {
+        elBtnIcon.textContent = user.avatar || '👤'; // Show selected user's avatar
+        elBtn.style.background = 'rgba(139, 92, 246, 0.15)'; // highlight background
+        elBtn.style.borderColor = 'var(--accent-purple)'; // purple border highlight
+        elBtn.title = `סנן לפי בן משפחה: ${user.name}`;
+      } else {
+        elBtnIcon.textContent = '👥';
+        elBtn.style.background = 'rgba(255, 255, 255, 0.03)';
+        elBtn.style.borderColor = 'var(--border-color)';
+        elBtn.title = 'סנן לפי בן משפחה';
+      }
+    }
+  }
+
   if (filter === 'my' && elTaskAssigneeFilter) {
-    elTaskAssigneeFilter.value = state.currentUser.id;
+    elTaskAssigneeFilter.value = state.currentUser ? state.currentUser.id : '';
   }
 
   let filteredTasks = [];
@@ -2130,7 +2498,7 @@ function renderTasks() {
   if (filter === 'my') {
     // Tasks assigned directly to current user that are active (not completed today or completed permanently)
     filteredTasks = state.tasks.filter(t => {
-      return t.assignedTo === state.currentUser.id && t.status !== 'completed' && !isTaskCompletedToday(t);
+      return t.assignedTo === (state.currentUser ? state.currentUser.id : '') && t.status !== 'completed' && !isTaskCompletedToday(t);
     });
   } else if (filter === 'paid') {
     // Show paid active tasks
@@ -2227,11 +2595,9 @@ function renderTasks() {
         `;
       }
 
-      if (isAdmin) {
-        actionHTML += `
-          <button class="btn btn-secondary" onclick="triggerEditTask('${task.id}')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); flex-grow: 0.5;">✏️ ערוך</button>
-        `;
-      }
+      actionHTML += `
+        <button class="btn btn-secondary" onclick="triggerEditTask('${task.id}')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); flex-grow: 0.5;">✏️ ערוך</button>
+      `;
 
       actionHTML = `
         <div style="display: flex; gap: 8px; width: 100%; flex-wrap: wrap;">
@@ -2252,14 +2618,12 @@ function renderTasks() {
           ✓ בוצע על ידי ${compUser.name}
         </span>
       `;
-      if (isAdmin) {
-        actionHTML = `
-          <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-            ${actionHTML}
-            <button class="btn btn-secondary" onclick="triggerEditTask('${task.id}')" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); width: 100%;">✏️ ערוך משימה (הורה)</button>
-          </div>
-        `;
-      }
+      actionHTML = `
+        <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+          ${actionHTML}
+          <button class="btn btn-secondary" onclick="triggerEditTask('${task.id}')" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); width: 100%;">✏️ ערוך משימה</button>
+        </div>
+      `;
     }
 
     // Format scheduling string
@@ -2330,6 +2694,74 @@ window.toggleCalendarMenu = function(event, taskId) {
   }
 };
 
+async function sendCompletionEmail(task, completedByUser) {
+  const parents = state.users.filter(u => u.role === 'admin' && u.email);
+  if (parents.length === 0) {
+    console.warn("No admin users with email addresses found to send notification.");
+    return null;
+  }
+
+  const parentEmails = parents.map(p => p.email);
+  const parentNames = parents.map(p => p.name).join(' ו-');
+  
+  const emailPayload = {
+    to: parentEmails,
+    subject: `מטלת בית הושלמה: ${task.title}`,
+    body: `היי, המשימה "${task.title}" הושלמה בהצלחה על ידי ${completedByUser.name}.`,
+    timestamp: new Date().toISOString()
+  };
+
+  console.log("Sending task completion email (Simulation)...", emailPayload);
+
+  // Perform mock REST fetch dispatch to simulate a real HTTP request
+  try {
+    const response = await fetch('https://httpbin.org/post', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(emailPayload)
+    });
+    if (response.ok) {
+      console.log("Email dispatch API response (Simulation): success", await response.json());
+    } else {
+      console.error("Email dispatch API error status:", response.status);
+    }
+  } catch (error) {
+    console.error("Failed to fetch mock email dispatch:", error);
+  }
+
+  // Create email-sent history log entry so it is visible in the recent activity feed
+  const todayStr = formatDateString(new Date());
+  const emailHistoryId = `${state.groupId}-hist-${Date.now()}-email`;
+  const emailHistoryEntry = {
+    id: emailHistoryId,
+    groupId: state.groupId,
+    taskId: task.id,
+    title: `נשלח מייל עדכון ל${parentNames}`,
+    action: 'email-sent',
+    reward: 0,
+    stars: 0,
+    completedBy: completedByUser.id,
+    completedDate: todayStr,
+    timestamp: new Date().toISOString()
+  };
+
+  if (state.groupId === 'local-sandbox') {
+    state.history.push(emailHistoryEntry);
+    saveState();
+    renderDashboard();
+  } else if (db) {
+    try {
+      await db.collection('history').doc(emailHistoryId).set(emailHistoryEntry);
+    } catch (err) {
+      console.error("Failed to save email history log to Firestore:", err);
+    }
+  }
+
+  return `נשלח מייל עדכון ל${parentNames}!`;
+}
+
 window.claimAndCompleteTask = async function(taskId) {
   const task = state.tasks.find(t => t.id === taskId);
   if (task && task.assignedTo === 'all') {
@@ -2344,10 +2776,63 @@ window.triggerCompleteTask = async function(taskId) {
   
   const task = state.tasks[taskIndex];
   
-  // Find card element in DOM and add fade-out class
+  // Find card element in DOM and show V pyrotechnics celebration
   const cardEl = document.getElementById(`task-card-${taskId}`);
   if (cardEl) {
+    // 1. Create the celebration overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'v-celebration-overlay';
+    overlay.innerHTML = `
+      <div class="v-celebration-circle">
+        <svg class="v-celebration-svg" viewBox="0 0 52 52">
+          <path class="v-celebration-path" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        </svg>
+      </div>
+    `;
+    cardEl.appendChild(overlay);
+
+    // 2. Spawn explosion particles
+    const colors = ['#34d399', '#a78bfa', '#f59e0b', '#ec4899', '#06b6d4'];
+    for (let i = 0; i < 30; i++) {
+      const p = document.createElement('div');
+      const types = ['circle', 'star', 'checkmark'];
+      const type = types[Math.floor(Math.random() * types.length)];
+      p.className = `v-particle ${type} v-particle-animated`;
+      
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 40 + Math.random() * 120;
+      const tx = Math.cos(angle) * distance + 'px';
+      const ty = Math.sin(angle) * distance + 'px';
+      const scale = 0.3 + Math.random() * 0.7;
+      const rot = Math.floor(Math.random() * 360) + 'deg';
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      
+      p.style.setProperty('--tx', tx);
+      p.style.setProperty('--ty', ty);
+      p.style.setProperty('--scale', scale);
+      p.style.setProperty('--rot', rot);
+      
+      if (type === 'checkmark') {
+        p.style.borderColor = color;
+      } else {
+        p.style.background = color;
+      }
+      
+      p.style.left = '50%';
+      p.style.top = '50%';
+      p.style.transform = 'translate(-50%, -50%)';
+      
+      overlay.appendChild(p);
+    }
+    
+    // 3. Wait for the celebration animation before fading out the card
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    
+    // 4. Add the fade-out class to make the card disappear
     cardEl.classList.add('fade-out-complete');
+    
+    // Wait for the fade-out animation to complete (0.35s)
+    await new Promise(resolve => setTimeout(resolve, 350));
   }
 
   const todayStr = formatDateString(new Date());
@@ -2385,6 +2870,13 @@ window.triggerCompleteTask = async function(taskId) {
     }
   }
 
+  // Send completion email to parents
+  sendCompletionEmail(task, user || state.currentUser).then(toastMsg => {
+    if (toastMsg) {
+      showToast(toastMsg, 'email');
+    }
+  });
+
   // Handle recurrence vs one-off
   if (task.type === 'recurring') {
     if (task.title.includes('הכלב') || task.title.includes('כלים') || task.title.includes('רכב')) {
@@ -2398,6 +2890,19 @@ window.triggerCompleteTask = async function(taskId) {
     task.status = 'completed';
     task.completedBy = state.currentUser.id;
     task.completedDate = todayStr;
+  }
+
+  if (state.groupId === 'local-sandbox') {
+    state.history.push(historyEntry);
+    saveState();
+    updateProfileUI();
+    const delay = cardEl ? 350 : 0;
+    setTimeout(() => {
+      renderDashboard();
+      renderTasks();
+      renderAdminPanel();
+    }, delay);
+    return;
   }
 
   try {
@@ -2769,15 +3274,26 @@ function renderProfilesList() {
       `;
     }
 
+    let inviteButtonsHTML = '';
+    if (!isSelf) {
+      inviteButtonsHTML = `
+        <button type="button" class="btn btn-share-wa" title="הזמן בוואטסאפ" style="background: rgba(37, 211, 102, 0.1); border: 1px solid rgba(37, 211, 102, 0.2); color: #25d366; padding: 6px 10px; border-radius: var(--border-radius-sm); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-weight: bold; margin-left: 4px;">💬 הזמן</button>
+        <button type="button" class="btn btn-share-mail" title="הזמן במייל" style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 6px 10px; border-radius: var(--border-radius-sm); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-weight: bold;">✉️ הזמן</button>
+      `;
+    }
+
     item.innerHTML = `
       <div class="admin-user-details">
         <span style="font-size: 1.6rem; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); box-shadow: inset 0 0 10px ${user.color}30; overflow: hidden;">${getAvatarHTML(user.avatar)}</span>
         <div class="admin-user-balance-info">
           <span style="font-weight: 700;">${user.name} ${isSelf ? '<span style="font-size: 0.75rem; color: #a78bfa; font-weight: 500;">(אני)</span>' : ''}</span>
           <span style="font-size: 0.75rem; color: var(--text-secondary);">${user.role === 'admin' ? 'הורה (מנהל)' : 'ילד / משתתף'}</span>
+          ${user.email ? `<span style="font-size: 0.7rem; color: #60a5fa; display: block; margin-top: 2px;">✉️ ${user.email}</span>` : ''}
+          ${user.phone ? `<span style="font-size: 0.7rem; color: #34d399; display: block; margin-top: 1px;">📱 ${user.phone}</span>` : ''}
         </div>
       </div>
       <div style="display:flex; align-items:center; gap: 8px;">
+        ${inviteButtonsHTML}
         ${actionsHTML}
       </div>
     `;
@@ -2796,6 +3312,42 @@ function renderProfilesList() {
         triggerDeleteProfile(user.id);
       });
     }
+
+    const waBtn = item.querySelector('.btn-share-wa');
+    if (waBtn) {
+      waBtn.addEventListener('click', () => {
+        if (state.groupId === 'local-sandbox') {
+          showToast("על מנת לשלוח הזמנה, עליך להקליד שם קבוצה וללחוץ על 'שמור 💾' תחילה כדי להקים את הקבוצה המשותפת.", "warning");
+          const elNicknameInput = document.getElementById('admin-family-nickname-input');
+          if (elNicknameInput) elNicknameInput.focus();
+          return;
+        }
+        const inviteLink = `${window.location.origin}${window.location.pathname}?group=${state.groupId}&userId=${user.id}`;
+        const message = encodeURIComponent(`היי ${user.name}, הצטרף לקבוצה המשפחתית שלנו ב-StarTask! היכנס ישירות מכאן ללא צורך בהזנת קוד: ${inviteLink}`);
+        const cleanPhone = user.phone ? user.phone.replace(/[-]/g, '') : '';
+        const waUrl = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('0') ? '972' + cleanPhone.substring(1) : cleanPhone}?text=${message}` : `https://api.whatsapp.com/send?text=${message}`;
+        window.open(waUrl, '_blank');
+      });
+    }
+
+    const mailBtn = item.querySelector('.btn-share-mail');
+    if (mailBtn) {
+      mailBtn.addEventListener('click', () => {
+        if (state.groupId === 'local-sandbox') {
+          showToast("על מנת לשלוח הזמנה, עליך להקליד שם קבוצה וללחוץ על 'שמור 💾' תחילה כדי להקים את הקבוצה המשותפת.", "warning");
+          const elNicknameInput = document.getElementById('admin-family-nickname-input');
+          if (elNicknameInput) elNicknameInput.focus();
+          return;
+        }
+        const inviteLink = `${window.location.origin}${window.location.pathname}?group=${state.groupId}&userId=${user.id}`;
+        const subject = encodeURIComponent(`הזמנה להצטרף ללוח המטלות המשפחתי StarTask`);
+        const body = encodeURIComponent(`היי ${user.name},\n\nהוזמנת להצטרף לקבוצה המשפחתית שלנו ב-StarTask!\n\nהיכנס ישירות דרך הקישור הבא ללא צורך בהזנת קוד נוסף:\n${inviteLink}\n\nבהצלחה!`);
+        const mailUrl = user.email ? `mailto:${user.email}?subject=${subject}&body=${body}` : `mailto:?subject=${subject}&body=${body}`;
+        const a = document.createElement('a');
+        a.href = mailUrl;
+        a.click();
+      });
+    }
     
     elAdminProfilesList.appendChild(item);
   });
@@ -2809,6 +3361,8 @@ function triggerEditProfile(userId) {
   document.getElementById('admin-edit-profile-id').value = user.id;
   document.getElementById('admin-edit-profile-name').value = user.name;
   document.getElementById('admin-edit-profile-avatar').value = user.avatar;
+  document.getElementById('admin-edit-profile-email').value = user.email || '';
+  document.getElementById('admin-edit-profile-phone').value = user.phone || '';
   
   const elRoleSelect = document.getElementById('admin-edit-profile-role');
   if (elRoleSelect) {
@@ -2851,6 +3405,25 @@ async function triggerDeleteProfile(userId) {
     });
   }
 
+  if (state.groupId === 'local-sandbox') {
+    if (fallbackUser) {
+      state.tasks.forEach(t => {
+        if (t.assignedTo === userId) {
+          t.assignedTo = fallbackUser.id;
+        }
+      });
+    }
+    state.users = state.users.filter(u => u.id !== userId);
+    saveState();
+    localStorage.setItem('household_pending_toast', JSON.stringify({
+      message: `הפרופיל של ${user.name} נמחק בהצלחה.`,
+      type: 'success'
+    }));
+    localStorage.setItem('household_family_settings_open', 'true');
+    window.location.reload();
+    return;
+  }
+
   // Delete the user from state via mock db helper
   await db.collection('users').doc(userId).delete();
   if (taskUpdatePromises.length > 0) {
@@ -2868,6 +3441,7 @@ async function triggerDeleteProfile(userId) {
     message: `הפרופיל של ${user.name} נמחק בהצלחה.`,
     type: 'success'
   }));
+  localStorage.setItem('household_family_settings_open', 'true');
   window.location.reload();
 }
 
@@ -2885,6 +3459,15 @@ function payoutUser(userId) {
     // If we paid out the current user, sync the context
     if (state.currentUser.id === userId) {
       state.currentUser.balance = 0;
+    }
+
+    if (state.groupId === 'local-sandbox') {
+      saveState();
+      updateProfileUI();
+      renderDashboard();
+      renderTasks();
+      showToast(`היתרה של ${user.name} אופסה בהצלחה.`, 'success');
+      return;
     }
 
     try {
@@ -2956,9 +3539,9 @@ function checkTaskReminders() {
 
         if (hasNotificationPermission) {
           try {
-            new Notification(`CleanHome: תזכורת למשימה`, {
+            new Notification(`StarTask: תזכורת למשימה`, {
               body: `הגיע הזמן לבצע: ${task.title} (${task.time || ''})${task.reward > 0 ? ` - תגמול: ₪${task.reward}` : ''}`,
-              icon: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🏡</text></svg>'
+              icon: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⭐</text></svg>'
             });
           } catch (e) {
             console.error('Failed to trigger notification:', e);
@@ -3201,6 +3784,48 @@ async function saveTaskEdit(e) {
       task.completedDate = null;
     }
 
+    if (status === 'completed' && oldStatus !== 'completed') {
+      const completedByUser = state.users.find(u => u.id === (assignedTo !== 'all' ? assignedTo : state.currentUser.id)) || state.currentUser;
+      try {
+        const toastMsg = await sendCompletionEmail(task, completedByUser);
+        if (toastMsg) {
+          localStorage.setItem('household_pending_email_toast', JSON.stringify({
+            message: toastMsg,
+            type: 'email'
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to send completion email in saveTaskEdit:", err);
+      }
+    }
+
+    if (state.groupId === 'local-sandbox') {
+      if (status === 'completed' && oldStatus !== 'completed') {
+        const todayStr = formatDateString(new Date());
+        const historyId = `${state.groupId}-hist-${Date.now()}`;
+        state.history.push({
+          id: historyId,
+          groupId: state.groupId,
+          taskId: id,
+          title: title,
+          action: 'completed',
+          reward: reward,
+          stars: stars,
+          completedBy: assignedTo !== 'all' ? assignedTo : state.currentUser.id,
+          completedDate: todayStr,
+          timestamp: new Date().toISOString()
+        });
+      }
+      saveState();
+      elEditTaskOverlay.classList.remove('active');
+      localStorage.setItem('household_pending_toast', JSON.stringify({
+        message: `המשימה "${title}" עודכנה בהצלחה!`,
+        type: 'success'
+      }));
+      window.location.reload();
+      return;
+    }
+
     promises.push(db.collection('tasks').doc(id).set(task));
     if (userToUpdate) {
       promises.push(db.collection('users').doc(userToUpdate.id).set(userToUpdate));
@@ -3231,19 +3856,33 @@ async function deleteTask(taskId) {
   if (!confirmDelete) return;
   
   const historyId = `${state.groupId}-hist-${Date.now()}`;
+  const historyEntry = {
+    id: historyId,
+    groupId: state.groupId,
+    taskId: taskId,
+    title: task.title,
+    action: 'deleted',
+    reward: 0,
+    completedBy: state.currentUser.id,
+    completedDate: formatDateString(new Date()),
+    timestamp: new Date().toISOString()
+  };
+
+  if (state.groupId === 'local-sandbox') {
+    state.tasks = state.tasks.filter(t => t.id !== taskId);
+    state.history.push(historyEntry);
+    saveState();
+    elEditTaskOverlay.classList.remove('active');
+    showToast(`המשימה "${task.title}" נמחקה בהצלחה!`, 'success');
+    renderTasks();
+    renderDashboard();
+    renderAdminPanel();
+    return;
+  }
+
   try {
     await db.collection('tasks').doc(taskId).delete();
-    await db.collection('history').doc(historyId).set({
-      id: historyId,
-      groupId: state.groupId,
-      taskId: taskId,
-      title: task.title,
-      action: 'deleted',
-      reward: 0,
-      completedBy: state.currentUser.id,
-      completedDate: formatDateString(new Date()),
-      timestamp: new Date().toISOString()
-    });
+    await db.collection('history').doc(historyId).set(historyEntry);
   } catch (err) {
     console.error("Firebase deleteTask failed:", err);
   }
@@ -3293,6 +3932,16 @@ window.dropTaskOnCard = async function(event, targetTaskId) {
   const [movedTask] = state.tasks.splice(fromIndex, 1);
   state.tasks.splice(toIndex, 0, movedTask);
   
+  if (state.groupId === 'local-sandbox') {
+    state.tasks.forEach((t, idx) => {
+      t.order = idx;
+    });
+    saveState();
+    renderTasks();
+    showToast('סדר המשימות עודכן בהצלחה!', 'success');
+    return;
+  }
+
   // Update order properties based on new array indices
   const promises = state.tasks.map((t, idx) => {
     t.order = idx;
@@ -3372,7 +4021,7 @@ window.setStarRatingValue = function(containerId, hiddenInputId, val) {
 };
 
 function initThemeSelector() {
-  const savedTheme = localStorage.getItem('household_color_theme') || 'midnight';
+  const savedTheme = localStorage.getItem('household_color_theme') || 'light';
   applyTheme(savedTheme);
 
   const themeDots = document.querySelectorAll('.theme-dot');
@@ -3401,11 +4050,415 @@ function initThemeSelector() {
   });
 }
 
+function initOnboardingWizard() {
+  const overlay = document.getElementById('onboarding-wizard-overlay');
+  if (!overlay) return;
+  
+  overlay.style.display = 'flex';
+  
+  let wizardData = {
+    role: '',
+    name: '',
+    phone: '',
+    avatar: '👧'
+  };
+  
+  // Bind role cards
+  const roleCards = document.querySelectorAll('.wizard-role-card');
+  roleCards.forEach(card => {
+    card.addEventListener('click', () => {
+      roleCards.forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      wizardData.role = card.getAttribute('data-role');
+      
+      // Auto-transition to Step 2
+      setTimeout(() => {
+        const step1 = document.getElementById('wizard-step-1');
+        const step2 = document.getElementById('wizard-step-2');
+        if (step1 && step2) {
+          step1.classList.remove('active');
+          step1.style.display = 'none';
+          step2.style.display = 'block';
+          setTimeout(() => {
+            step2.classList.add('active');
+          }, 10);
+        }
+      }, 300);
+    });
+  });
+  
+  // Bind Step 2 buttons
+  const btnBackTo1 = document.getElementById('btn-wizard-back-to-1');
+  if (btnBackTo1) {
+    btnBackTo1.addEventListener('click', () => {
+      const step1 = document.getElementById('wizard-step-1');
+      const step2 = document.getElementById('wizard-step-2');
+      if (step1 && step2) {
+        step2.classList.remove('active');
+        step2.style.display = 'none';
+        step1.style.display = 'block';
+        setTimeout(() => {
+          step1.classList.add('active');
+        }, 10);
+      }
+    });
+  }
+  
+  const btnTo3 = document.getElementById('btn-wizard-to-3');
+  if (btnTo3) {
+    btnTo3.addEventListener('click', () => {
+      const nameVal = document.getElementById('wizard-name').value.trim();
+      const phoneVal = document.getElementById('wizard-phone').value.trim();
+      
+      if (!nameVal) {
+        showToast('אנא הכנס/י שם פרטי או כינוי', 'warning');
+        return;
+      }
+      if (!phoneVal) {
+        showToast('אנא הכנס/י מספר טלפון נייד', 'warning');
+        return;
+      }
+      
+      const phoneDigits = phoneVal.replace(/[^0-9]/g, '');
+      if (phoneDigits.length < 9 || phoneDigits.length > 15) {
+        showToast('אנא הכנס/י מספר טלפון תקין (לפחות 9 ספרות)', 'warning');
+        return;
+      }
+      
+      wizardData.name = nameVal;
+      wizardData.phone = phoneVal;
+      
+      const step2 = document.getElementById('wizard-step-2');
+      const step3 = document.getElementById('wizard-step-3');
+      if (step2 && step3) {
+        step2.classList.remove('active');
+        step2.style.display = 'none';
+        step3.style.display = 'block';
+        setTimeout(() => {
+          step3.classList.add('active');
+        }, 10);
+        
+        // Load avatar option grid
+        initAvatarPicker('wizard');
+      }
+    });
+  }
+  
+  // Bind Step 3 buttons
+  const btnBackTo2 = document.getElementById('btn-wizard-back-to-2');
+  if (btnBackTo2) {
+    btnBackTo2.addEventListener('click', () => {
+      const step2 = document.getElementById('wizard-step-2');
+      const step3 = document.getElementById('wizard-step-3');
+      if (step2 && step3) {
+        step3.classList.remove('active');
+        step3.style.display = 'none';
+        step2.style.display = 'block';
+        setTimeout(() => {
+          step2.classList.add('active');
+        }, 10);
+      }
+    });
+  }
+  
+  const btnFinish = document.getElementById('btn-wizard-finish');
+  if (btnFinish) {
+    btnFinish.addEventListener('click', () => {
+      const avatarVal = document.getElementById('wizard-profile-avatar').value;
+      wizardData.avatar = avatarVal;
+      
+      const rolePrefix = wizardData.role === 'mom' ? 'mom' : (wizardData.role === 'dad' ? 'dad' : 'child');
+      const userId = `local-user-${rolePrefix}-${Date.now()}`;
+      
+      const userProfile = {
+        id: userId,
+        name: wizardData.name,
+        role: (wizardData.role === 'mom' || wizardData.role === 'dad') ? 'admin' : 'member',
+        originalRole: wizardData.role,
+        phone: wizardData.phone,
+        avatar: wizardData.avatar,
+        balance: 0,
+        stars: 0,
+        groupId: 'local-sandbox',
+        email: wizardData.role === 'mom' ? 'mom@startask.com' : (wizardData.role === 'dad' ? 'dad@startask.com' : ''),
+        phone: wizardData.role === 'mom' ? '050-1111111' : (wizardData.role === 'dad' ? '050-2222222' : '')
+      };
+      
+      localStorage.removeItem('household_tasks_local-sandbox');
+      localStorage.removeItem('household_history_local-sandbox');
+      
+      // Seed default family members (Mom, Dad, Kid 1, Kid 2) ensuring they all exist
+      const defaultUsers = [userProfile];
+      if (wizardData.role === 'mom') {
+        defaultUsers.push({ id: 'user-dad', name: 'אבא', role: 'admin', avatar: '👨‍🦱', color: '#3b82f6', balance: 0, stars: 0, groupId: 'local-sandbox', email: 'dad@startask.com', phone: '050-2222222' });
+        defaultUsers.push({ id: 'user-kid1', name: 'ילד 1', role: 'member', avatar: '👦', color: '#10b981', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
+        defaultUsers.push({ id: 'user-kid2', name: 'ילד 2', role: 'member', avatar: '👧', color: '#f59e0b', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
+      } else if (wizardData.role === 'dad') {
+        defaultUsers.push({ id: 'user-mom', name: 'אמא', role: 'admin', avatar: '👩‍🦰', color: '#ec4899', balance: 0, stars: 0, groupId: 'local-sandbox', email: 'mom@startask.com', phone: '050-1111111' });
+        defaultUsers.push({ id: 'user-kid1', name: 'ילד 1', role: 'member', avatar: '👦', color: '#10b981', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
+        defaultUsers.push({ id: 'user-kid2', name: 'ילד 2', role: 'member', avatar: '👧', color: '#f59e0b', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
+      } else { // child
+        defaultUsers.push({ id: 'user-mom', name: 'אמא', role: 'admin', avatar: '👩‍🦰', color: '#ec4899', balance: 0, stars: 0, groupId: 'local-sandbox', email: 'mom@startask.com', phone: '050-1111111' });
+        defaultUsers.push({ id: 'user-dad', name: 'אבא', role: 'admin', avatar: '👨‍🦱', color: '#3b82f6', balance: 0, stars: 0, groupId: 'local-sandbox', email: 'dad@startask.com', phone: '050-2222222' });
+        defaultUsers.push({ id: 'user-kid2', name: 'ילד 2', role: 'member', avatar: '👧', color: '#f59e0b', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' });
+      }
+      
+      localStorage.setItem('household_users_local-sandbox', JSON.stringify(defaultUsers));
+      localStorage.setItem('household_user_profile', JSON.stringify(userProfile));
+      localStorage.setItem('household_current_user', userId);
+      localStorage.setItem('household_group_id', 'local-sandbox');
+      localStorage.setItem('household_visited', 'true');
+      
+      state.groupId = 'local-sandbox';
+      state.currentUser = userProfile;
+      state.users = defaultUsers;
+      
+      overlay.style.display = 'none';
+      
+      // Load local state (tasks, history are empty, users are loaded)
+      loadLocalState();
+      
+      localStorage.setItem('household_active_tab', 'home');
+      
+      isInitialLoad = true;
+      onStateUpdated();
+      
+      showToast('ברוכים הבאים! הפרופיל שלך נוצר בהצלחה. 🚀', 'success');
+      
+      // Bind group setup handlers now that sandbox is active
+      initGroupSetupHandlers();
+    });
+  }
+}
+
+function initGroupSetupHandlers() {
+  const settingsBuildGroupBtn = document.getElementById('settings-build-group-btn');
+  const headerCreateGroupBtn = document.getElementById('header-create-group-btn');
+  const groupSetupOverlay = document.getElementById('group-setup-overlay');
+  
+  const openSetup = () => {
+    if (groupSetupOverlay) {
+      groupSetupOverlay.classList.add('active');
+    }
+  };
+  if (settingsBuildGroupBtn) {
+    settingsBuildGroupBtn.addEventListener('click', openSetup);
+  }
+  if (headerCreateGroupBtn) {
+    headerCreateGroupBtn.addEventListener('click', openSetup);
+  }
+  
+  // Close overlay if clicking outside the modal
+  if (groupSetupOverlay) {
+    groupSetupOverlay.addEventListener('click', (e) => {
+      if (e.target === groupSetupOverlay) {
+        groupSetupOverlay.classList.remove('active');
+      }
+    });
+  }
+
+  // Bind the buttons inside the setup modal
+  const btnCreateNewGroup = document.getElementById('btn-create-new-group');
+  if (btnCreateNewGroup) {
+    btnCreateNewGroup.replaceWith(btnCreateNewGroup.cloneNode(true));
+    const newBtnCreate = document.getElementById('btn-create-new-group');
+    newBtnCreate.addEventListener('click', async () => {
+      const inputGroupName = document.getElementById('input-group-name');
+      const groupName = (inputGroupName && inputGroupName.value.trim()) ? inputGroupName.value.trim() : 'המשפחה שלי';
+      const randomCode = `family-${Math.floor(10000 + Math.random() * 90000)}`;
+      
+      await migrateLocalDataToGroup(randomCode, true, groupName);
+    });
+  }
+
+  const btnJoinGroupCode = document.getElementById('btn-join-group-code');
+  if (btnJoinGroupCode) {
+    btnJoinGroupCode.replaceWith(btnJoinGroupCode.cloneNode(true));
+    const newBtnJoin = document.getElementById('btn-join-group-code');
+    newBtnJoin.addEventListener('click', async () => {
+      const inputGroupCode = document.getElementById('input-group-code');
+      const enteredCode = inputGroupCode ? inputGroupCode.value.trim() : '';
+      if (!enteredCode) {
+        showToast('אנא הכנס קוד משפחה תקין', 'warning');
+        return;
+      }
+      
+      try {
+        const groupSnap = await db.collection('groups').doc(enteredCode).get();
+        if (!groupSnap.exists) {
+          showToast('קוד הקבוצה שהוזן אינו קיים. אנא ודא/י שהקוד נכון.', 'warning');
+          return;
+        }
+        const groupName = groupSnap.data().name || 'משפחה משותפת';
+        await migrateLocalDataToGroup(enteredCode, false, groupName);
+      } catch (e) {
+        console.error("Error checking group code existence:", e);
+        showToast('שגיאה בחיבור למסד הנתונים לבדיקת קוד הקבוצה', 'warning');
+      }
+    });
+  }
+}
+
+async function migrateLocalDataToGroup(targetGroupId, isNewGroup, groupName) {
+  if (!db) {
+    showToast('אין חיבור למסד הנתונים של Firebase. העברת נתונים לענן אינה זמינה כעת.', 'warning');
+    return;
+  }
+  const localProfileStr = localStorage.getItem('household_user_profile');
+  if (!localProfileStr) {
+    showToast('שגיאה: לא נמצא פרופיל מקומי להעברה', 'warning');
+    return;
+  }
+  const localProfile = JSON.parse(localProfileStr);
+
+  const localUsersStr = localStorage.getItem('household_users_local-sandbox');
+  const localUsers = localUsersStr ? JSON.parse(localUsersStr) : [];
+
+  const migratedUserId = `${targetGroupId}-${localProfile.id}`;
+  const migratedProfile = {
+    ...localProfile,
+    id: migratedUserId,
+    groupId: targetGroupId
+  };
+
+  // Map all local sandbox users to the new group, ensuring they are properly set
+  const migratedUsers = localUsers.map(u => {
+    return {
+      ...u,
+      id: u.id === localProfile.id ? migratedUserId : `${targetGroupId}-${u.id}`,
+      groupId: targetGroupId
+    };
+  });
+
+  // Ensure current user is present
+  if (!migratedUsers.some(u => u.id === migratedUserId)) {
+    migratedUsers.push(migratedProfile);
+  }
+
+  const localTasksStr = localStorage.getItem('household_tasks_local-sandbox');
+  const localTasks = localTasksStr ? JSON.parse(localTasksStr) : [];
+  const customTasks = localTasks.filter(t => !t.id.startsWith('welcome-task-'));
+  const migratedTasks = customTasks.map(t => {
+    let assignedTo = t.assignedTo;
+    if (assignedTo && assignedTo !== 'all') {
+      const targetUser = localUsers.find(u => u.id === assignedTo);
+      assignedTo = targetUser ? (targetUser.id === localProfile.id ? migratedUserId : `${targetGroupId}-${targetUser.id}`) : `${targetGroupId}-${assignedTo}`;
+    }
+    let completedBy = t.completedBy;
+    if (completedBy) {
+      const targetUser = localUsers.find(u => u.id === completedBy);
+      completedBy = targetUser ? (targetUser.id === localProfile.id ? migratedUserId : `${targetGroupId}-${targetUser.id}`) : `${targetGroupId}-${completedBy}`;
+    }
+
+    return {
+      ...t,
+      id: `${targetGroupId}-${t.id}`,
+      groupId: targetGroupId,
+      assignedTo: assignedTo,
+      completedBy: completedBy
+    };
+  });
+
+  const localHistoryStr = localStorage.getItem('household_history_local-sandbox');
+  const localHistory = localHistoryStr ? JSON.parse(localHistoryStr) : [];
+  const migratedHistory = localHistory.map(h => {
+    let completedBy = h.completedBy;
+    if (completedBy) {
+      const targetUser = localUsers.find(u => u.id === completedBy);
+      completedBy = targetUser ? (targetUser.id === localProfile.id ? migratedUserId : `${targetGroupId}-${targetUser.id}`) : `${targetGroupId}-${completedBy}`;
+    }
+    return {
+      ...h,
+      id: `${targetGroupId}-${h.id}`,
+      groupId: targetGroupId,
+      taskId: h.taskId ? `${targetGroupId}-${h.taskId}` : h.taskId,
+      completedBy: completedBy
+    };
+  });
+
+  showToast('מבצע סנכרון והעברת נתונים לענן...', 'info');
+
+  try {
+    if (isNewGroup) {
+      await db.collection('groups').doc(targetGroupId).set({
+        id: targetGroupId,
+        name: groupName,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    const userPromises = migratedUsers.map(u => db.collection('users').doc(u.id).set(u));
+    await Promise.all(userPromises);
+
+    const taskPromises = migratedTasks.map(t => db.collection('tasks').doc(t.id).set(t));
+    await Promise.all(taskPromises);
+
+    const historyPromises = migratedHistory.map(h => db.collection('history').doc(h.id).set(h));
+    await Promise.all(historyPromises);
+
+    localStorage.setItem('household_group_id', targetGroupId);
+    localStorage.setItem('household_user_profile', JSON.stringify(migratedProfile));
+    localStorage.setItem('household_current_user', migratedUserId);
+    localStorage.setItem(`household_group_name_${targetGroupId}`, groupName);
+    
+    // Cache migrated data for offline fallback
+    localStorage.setItem(`household_users_${targetGroupId}`, JSON.stringify(migratedUsers));
+    localStorage.setItem(`household_tasks_${targetGroupId}`, JSON.stringify(migratedTasks));
+    localStorage.setItem(`household_history_${targetGroupId}`, JSON.stringify(migratedHistory));
+
+    localStorage.setItem('household_pending_toast', JSON.stringify({
+      message: isNewGroup ? `הקבוצה "${groupName}" הוקמה והנתונים סונכרנו בהצלחה! 🎉` : `הצטרפת לקבוצה ${targetGroupId} והנתונים סונכרנו! 🏠`,
+      type: 'success'
+    }));
+    localStorage.setItem('household_family_settings_open', 'true');
+
+    window.location.reload();
+  } catch (err) {
+    console.error("Migration to group failed:", err);
+    showToast('שגיאה בסנכרון הנתונים לענן. אנא נסה שנית.', 'warning');
+  }
+}
+
 function applyTheme(themeName) {
   // Remove all theme classes first
-  document.body.classList.remove('theme-midnight', 'theme-emerald', 'theme-ocean', 'theme-sunset', 'theme-cyberpunk');
+  document.body.classList.remove('theme-midnight', 'theme-emerald', 'theme-ocean', 'theme-sunset', 'theme-cyberpunk', 'theme-light');
   // Add selected theme class
   document.body.classList.add(`theme-${themeName}`);
+}
+
+// Google Auth Actions
+async function loginWithGoogle() {
+  if (!auth) {
+    showToast('שגיאה: Firebase Auth אינו זמין כעת.', 'warning');
+    return;
+  }
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    showToast('מתחבר ל-Google...', 'info');
+    await auth.signInWithRedirect(provider);
+  } catch (error) {
+    console.error("Google Auth failed:", error);
+    showToast(`שגיאת התחברות: ${error.message}`, 'warning');
+  }
+}
+
+async function signOutUser() {
+  if (!auth) return;
+  try {
+    await auth.signOut();
+    
+    // Clear Google user credentials and reset to sandbox
+    localStorage.removeItem('household_user_profile');
+    localStorage.removeItem('household_current_user');
+    localStorage.setItem('household_group_id', 'local-sandbox');
+    localStorage.removeItem('household_visited');
+    
+    showToast('התנתקת מהחשבון בהצלחה.', 'success');
+    window.location.reload();
+  } catch (error) {
+    console.error("Sign out failed:", error);
+    showToast(`שגיאת התנתקות: ${error.message}`, 'warning');
+  }
 }
 
 // Start application

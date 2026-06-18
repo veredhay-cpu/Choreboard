@@ -3,29 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CleanHome - ניהול משימות הבית המשפחתי</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏡</text></svg>">
-  <link rel="stylesheet" href="styles.css">
+  <title>StarTask - ניהול משימות הבית המשפחתי</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⭐</text></svg>">
+  <link rel="stylesheet" href="styles.css?v=1.0.1">
 </head>
-<body class="theme-midnight">
+<body class="theme-light">
 
   <div class="app-container">
     
     <!-- HEADER -->
     <header class="glass-panel">
       <div class="logo-section">
-        <h1>🏡 CleanHome</h1>
+        <h1 style="display: flex; align-items: center; gap: 8px;">
+          ⭐ StarTask
+          <span id="header-group-badge" class="group-badge" style="display: none; font-size: 0.85rem; padding: 4px 10px; border-radius: 50px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.2); font-weight: bold;"></span>
+        </h1>
         <p>מערכת המשימות והתגמולים של המשפחה</p>
-      </div>
-      
-      <!-- Theme Selector -->
-      <div class="theme-selector">
-        <span class="theme-label">🎨 סקין:</span>
-        <button class="theme-dot dot-midnight" data-theme="midnight" title="סגול חצות"></button>
-        <button class="theme-dot dot-emerald" data-theme="emerald" title="מנטה רענן"></button>
-        <button class="theme-dot dot-ocean" data-theme="ocean" title="כחול אוקיינוס"></button>
-        <button class="theme-dot dot-sunset" data-theme="sunset" title="ורד השקיעה"></button>
-        <button class="theme-dot dot-cyberpunk" data-theme="cyberpunk" title="סייברפאנק ניאון"></button>
       </div>
       
       <div class="profile-bar">
@@ -34,15 +27,26 @@
           <div class="profile-info">
             <span class="profile-name" id="active-name">טוען...</span>
             <span class="profile-role" id="active-role">משתמש</span>
-            <span class="profile-balance-summary" style="font-size: 0.8rem; font-weight: bold; margin-top: 2px; display: flex; gap: 6px; align-items: center;">
-              <span style="color: var(--accent-emerald);" id="header-cash-val">₪0</span>
-              <span style="color: var(--text-muted);">|</span>
-              <span style="color: #a78bfa;" id="header-stars-val">⭐ 0</span>
-            </span>
           </div>
           <div class="profile-switch-indicator" style="font-size: 0.9rem; color: var(--text-secondary); margin-right: 8px; margin-left: 2px; display: flex; align-items: center;">🔄</div>
         </div>
         
+        <!-- Google Sign-In Button -->
+        <button class="google-login-btn" id="header-google-login-btn" style="display: none; align-items: center; gap: 8px; font-weight: bold; padding: 8px 16px; border-radius: 20px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: var(--transition-smooth); font-size: 0.9rem;">
+          <svg class="google-icon" viewBox="0 0 24 24" style="width: 18px; height: 18px; flex-shrink: 0;">
+            <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.68 1.54 14.98 1 12 1 7.24 1 3.2 3.74 1.25 7.72l3.86 3C6.07 7.74 8.78 5.04 12 5.04z"/>
+            <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.92c2.2-2.03 3.67-5.02 3.67-8.65z"/>
+            <path fill="#FBBC05" d="M5.11 14.72c-.26-.77-.4-1.6-.4-2.47s.14-1.7.4-2.47L1.25 7.72C.45 9.36 0 11.13 0 13s.45 3.64 1.25 5.28l3.86-3z"/>
+            <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.92c-1.08.72-2.45 1.16-4.2 1.16-3.22 0-5.93-2.7-6.89-5.68l-3.86 3C3.2 20.26 7.24 23 12 23z"/>
+          </svg>
+          <span>התחבר עם Google</span>
+        </button>
+
+        <!-- Create Group Button -->
+        <button class="btn btn-primary" id="header-create-group-btn" style="display: none; align-items: center; gap: 8px; font-weight: bold; padding: 8px 16px; border-radius: 20px; background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; color: #fff; cursor: pointer; transition: var(--transition-smooth); font-size: 0.9rem;">
+          👥 צור קבוצה
+        </button>
+
         <!-- Sleek Admin Settings Gear Button -->
         <button class="switcher-btn" id="header-admin-gear-btn" title="ניהול והגדרות משפחה" style="display: none; padding: 0; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 50%; font-size: 1.25rem; cursor: pointer; align-items: center; justify-content: center; width: 44px; height: 44px; transition: var(--transition-smooth); flex-shrink: 0;">⚙️</button>
         
@@ -50,24 +54,87 @@
       </div>
     </header>
 
-    <!-- Elongated Add Task Button Above Navigation Tabs -->
-    <div class="add-task-btn-container" style="display: flex; width: 100%; margin-bottom: 16px;">
-      <button class="btn btn-primary" id="nav-add-task-btn" style="display: none; width: 100%; align-items: center; justify-content: center; gap: 8px; font-weight: bold; padding: 14px; font-size: 1.1rem; border-radius: 50px; background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; box-shadow: var(--shadow-glow); cursor: pointer; transition: var(--transition-smooth); color: #fff;">
-        ➕ משימה חדשה לבית
-      </button>
-    </div>
-
-    <!-- NAVIGATION TABS -->
-    <nav class="nav-tabs">
-      <button class="nav-tab active" data-tab="tasks">📋 משימות לביצוע</button>
-      <button class="nav-tab" data-tab="dashboard">📊 לוח בקרה</button>
-    </nav>
+    <!-- NAVIGATION TABS REMOVED -->
 
     <!-- MAIN PANELS -->
     <main>
       
+      <!-- HOME PANEL -->
+      <section class="tab-content active" id="home-tab-content">
+        <div class="home-menu-grid">
+          
+          <!-- Card 1: Add Task -->
+          <div class="menu-card menu-card-add-task" id="menu-card-add-task">
+            <div class="menu-card-icon">➕</div>
+            <div style="flex-grow: 1; text-align: right; direction: rtl;">
+              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">משימה חדשה</h3>
+              <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">הוספת מטלה או משימה חדשה ללוח המשפחה</p>
+            </div>
+            <div style="font-size: 1.1rem; color: var(--text-muted);">👈</div>
+          </div>
+          
+          <!-- Card 2: Tasks Chores -->
+          <div class="menu-card" id="menu-card-tasks">
+            <div class="menu-card-icon">📋</div>
+            <div style="flex-grow: 1; text-align: right; direction: rtl;">
+              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">משימות המשפחה</h3>
+              <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">צפייה במשימות, סינונים ועדכון ביצוע</p>
+            </div>
+            <div style="font-size: 1.1rem; color: var(--text-muted);">👈</div>
+          </div>
+          
+          <!-- Card: Dashboard -->
+          <div class="menu-card" id="menu-card-dashboard">
+            <div class="menu-card-icon">📊</div>
+            <div style="flex-grow: 1; text-align: right; direction: rtl;">
+              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">לוח בקרה</h3>
+              <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">סטטיסטיקות, ביצועים ויתרות כספיות</p>
+            </div>
+            <div style="font-size: 1.1rem; color: var(--text-muted);">👈</div>
+          </div>
+          
+          <!-- Card 3: Family Settings -->
+          <div class="menu-card" id="menu-card-settings">
+            <div class="menu-card-icon">⚙️</div>
+            <div style="flex-grow: 1; text-align: right; direction: rtl;">
+              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">הגדרות וניהול משפחה</h3>
+              <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">עריכת פרופילים, קוד קבוצה והזמנות</p>
+            </div>
+            <div style="font-size: 1.1rem; color: var(--text-muted);">👈</div>
+          </div>
+
+          <!-- Card 4: Display Settings (Theme Selector) -->
+          <div class="menu-card" id="menu-card-display" style="flex-direction: column; align-items: stretch; gap: 12px; cursor: default;">
+            <div style="display: flex; align-items: center; gap: 16px; width: 100%;">
+              <div class="menu-card-icon">🎨</div>
+              <div style="flex-grow: 1; text-align: right; direction: rtl;">
+                <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">הגדרות תצוגה</h3>
+                <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">בחירת סקין ועיצוב מועדף למערכת</p>
+              </div>
+            </div>
+            <div class="card-theme-selector">
+              <button class="theme-dot dot-light" data-theme="light" title="אור בהיר"></button>
+              <button class="theme-dot dot-midnight" data-theme="midnight" title="סגול חצות"></button>
+              <button class="theme-dot dot-emerald" data-theme="emerald" title="מנטה רענן"></button>
+              <button class="theme-dot dot-ocean" data-theme="ocean" title="כחול אוקיינוס"></button>
+              <button class="theme-dot dot-sunset" data-theme="sunset" title="ורד השקיעה"></button>
+              <button class="theme-dot dot-cyberpunk" data-theme="cyberpunk" title="סייברפאנק ניאון"></button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
       <!-- DASHBOARD PANEL -->
       <section class="tab-content" id="dashboard-tab-content">
+        
+        <!-- Back to Home Bar -->
+        <div class="back-to-home-bar">
+          <button class="btn btn-secondary" id="btn-dashboard-back-to-home" style="display: flex; align-items: center; gap: 6px; font-weight: bold; padding: 6px 14px; border-radius: 50px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; font-size: 0.85rem;">
+            🏡 חזרה לדף הבית
+          </button>
+          <h2 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">📊 לוח בקרה</h2>
+        </div>
         <div class="dashboard-grid">
           
           <div class="stat-card glass-panel pending" id="stat-card-pending" style="cursor: pointer;">
@@ -122,7 +189,20 @@
       </section>
 
       <!-- TASKS BOARD PANEL -->
-      <section class="tab-content active" id="tasks-tab-content">
+      <section class="tab-content" id="tasks-tab-content">
+        
+        <!-- Back to Home Bar -->
+        <div class="back-to-home-bar">
+          <button class="btn btn-secondary" id="btn-back-to-home" style="display: flex; align-items: center; gap: 6px; font-weight: bold; padding: 6px 14px; border-radius: 50px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; font-size: 0.85rem;">
+            🏡 חזרה לדף הבית
+          </button>
+          <h2 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">📋 משימות המשפחה</h2>
+        </div>
+
+        <!-- Create Task Button on Tasks Page -->
+        <button class="btn btn-primary" id="btn-create-task-on-tasks-page" style="width: 100%; margin: 12px 0; background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; font-weight: bold; padding: 12px; font-size: 0.95rem; cursor: pointer; box-shadow: var(--shadow-glow); border-radius: var(--border-radius-md); display: flex; align-items: center; justify-content: center; gap: 8px;">
+          ➕ צור משימה חדשה
+        </button>
         <div class="task-filters">
           <button class="filter-btn active" data-filter="my">🙋 המשימות שלי</button>
           <button class="filter-btn" data-filter="all">📂 המשימות של כולם</button>
@@ -130,13 +210,17 @@
           <button class="filter-btn" data-filter="paid">💰 משימות בתשלום</button>
         </div>
         
-        <div class="filter-dropdown-container" id="assignee-filter-container" style="display: none; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 12px; margin-bottom: 12px; padding: 4px 8px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--border-radius-md); width: fit-content;">
-          <label for="task-assignee-filter" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; white-space: nowrap;">👤 סנן לפי בן משפחה:</label>
-          <select id="task-assignee-filter" class="form-control" style="padding: 6px 12px; font-size: 0.85rem; background: rgba(30, 41, 59, 0.8); height: auto; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; width: 160px;">
-            <!-- Populated in JS -->
-          </select>
+        <div class="filter-dropdown-container" id="assignee-filter-container">
+          <div id="filter-icon-btn" title="סנן לפי בן משפחה">
+            <span id="filter-btn-icon">👥</span>
+            <select id="task-assignee-filter">
+              <!-- Populated in JS -->
+            </select>
+          </div>
         </div>
         
+
+
         <div class="tasks-section-grid" id="tasks-grid">
           <!-- Cards populated dynamically -->
         </div>
@@ -174,7 +258,13 @@
       </div>
 
       <div class="admin-actions-bar" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+
+        <!-- Google Sign Out Button -->
+        <button class="btn btn-secondary" id="settings-signout-btn" style="display: none; width: 100%; align-items: center; justify-content: center; gap: 8px; font-weight: bold; padding: 12px; font-size: 1rem; cursor: pointer; border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.05); color: #f87171; border-radius: var(--border-radius-md); transition: var(--transition-smooth);">
+          🚪 התנתק מחשבון Google
+        </button>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;" id="settings-code-row">
           <div id="admin-family-code-display" style="font-size: 0.95rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: var(--border-radius-md); font-weight: 600; flex-grow: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
             <span>קוד משפחה:</span>
             <span id="family-code-text" style="color: var(--accent-purple); font-family: monospace; font-size: 1.1rem; user-select: all; letter-spacing: 0.5px;">טוען...</span>
@@ -185,7 +275,7 @@
         <div id="admin-family-nickname-display" style="font-size: 0.95rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: var(--border-radius-md); font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; gap: 8px; flex-grow: 1;">
             <span>כינוי המשפחה:</span>
-            <input type="text" id="admin-family-nickname-input" class="form-control" placeholder="המשפחה שלי" style="padding: 4px 8px; font-size: 0.9rem; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); width: 140px; height: auto;" />
+            <input type="text" id="admin-family-nickname-input" class="form-control" placeholder="הקלד שם ליצירת קבוצה" style="padding: 4px 8px; font-size: 0.9rem; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: var(--border-radius-sm); width: 140px; height: auto;" />
           </div>
           <button class="btn btn-primary" id="admin-save-nickname-btn" style="padding: 6px 16px; font-size: 0.9rem; background: var(--accent-purple); border: none; border-radius: var(--border-radius-sm); cursor: pointer; font-weight: bold;">שמור 💾</button>
         </div>
@@ -218,6 +308,17 @@
                 <input type="file" id="admin-new-profile-upload" accept="image/*" style="display: none;">
                 <div class="avatar-options-grid" id="admin-new-avatar-options-grid">
                   <!-- Populated in JS -->
+                </div>
+              </div>
+
+              <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                  <label for="admin-new-profile-email">כתובת אימייל</label>
+                  <input type="email" id="admin-new-profile-email" class="form-control" placeholder="mom@startask.com">
+                </div>
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                  <label for="admin-new-profile-phone">טלפון נייד</label>
+                  <input type="tel" id="admin-new-profile-phone" class="form-control" placeholder="050-1234567">
                 </div>
               </div>
 
@@ -269,6 +370,17 @@
           <input type="file" id="admin-edit-profile-upload" accept="image/*" style="display: none;">
           <div class="avatar-options-grid" id="admin-edit-avatar-options-grid">
             <!-- Populated in JS -->
+          </div>
+        </div>
+
+        <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="admin-edit-profile-email">כתובת אימייל</label>
+            <input type="email" id="admin-edit-profile-email" class="form-control" placeholder="mom@startask.com">
+          </div>
+          <div class="form-group" style="flex: 1; margin-bottom: 0;">
+            <label for="admin-edit-profile-phone">טלפון נייד</label>
+            <input type="tel" id="admin-edit-profile-phone" class="form-control" placeholder="050-1234567">
           </div>
         </div>
 
@@ -563,7 +675,7 @@
   <div class="user-picker-overlay" id="welcome-overlay">
     <div class="user-picker-modal glass-panel" style="max-width: 440px; padding: 32px 24px; text-align: center;">
       <span style="font-size: 3.5rem; display: block; margin-bottom: 16px; animation: wave 0.8s infinite alternate; transform-origin: 70% 70%;">👋</span>
-      <h2 style="font-size: 1.6rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px;">ברוכים הבאים ל-CleanHome!</h2>
+      <h2 style="font-size: 1.6rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px;">ברוכים הבאים ל-StarTask!</h2>
       <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.6;">
         מערכת משימות הבית המשפחתית שלך. כדי להתחיל, הנה הצעד היחיד שצריך לעשות:
       </p>
@@ -584,7 +696,7 @@
     <div class="user-picker-modal glass-panel" style="max-width: 440px; padding: 24px; text-align: right;">
       <h2 style="font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; text-align: center;">👋 הצטרפות לבית המשפחה</h2>
       <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5; text-align: center;">
-        הוזמנת להצטרף לניהול משימות הבית המשפחתי ב-CleanHome! הגדר/י את הפרופיל שלך כדי להתחיל.
+        הוזמנת להצטרף לניהול משימות הבית המשפחתי ב-StarTask! הגדר/י את הפרופיל שלך כדי להתחיל.
       </p>
 
       <form id="join-family-form">
@@ -626,11 +738,110 @@
     </div>
   </div>
 
+  <!-- Onboarding Wizard Overlay -->
+  <div class="user-picker-overlay" id="onboarding-wizard-overlay" style="display: none; align-items: center; justify-content: center; z-index: 2000; overflow-y: auto; align-items: flex-start; padding: 30px 12px;">
+    <div class="user-picker-modal glass-panel" style="max-width: 480px; width: 90%; text-align: right; padding: 28px;">
+      
+      <!-- Step 1: Choose Role -->
+      <div class="wizard-step active" id="wizard-step-1">
+        <h2 style="font-size: 1.5rem; font-weight: 800; text-align: center; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">⭐ ברוכים הבאים ל-StarTask!</h2>
+        <p style="font-size: 0.95rem; color: var(--text-secondary); text-align: center; margin-bottom: 24px;">בואו נגדיר את הפרופיל שלכם. מה התפקיד שלכם בבית?</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+          <div class="wizard-role-card" data-role="mom" style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); cursor: pointer; background: rgba(255, 255, 255, 0.01); transition: var(--transition-smooth);">
+            <span style="font-size: 2.2rem;">👩‍🦰</span>
+            <div>
+              <span style="font-size: 1.1rem; font-weight: bold; color: var(--text-primary); display: block;">אמא</span>
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">ניהול משימות, אישור תגמולים והגדרת הבית</span>
+            </div>
+          </div>
+          
+          <div class="wizard-role-card" data-role="dad" style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); cursor: pointer; background: rgba(255, 255, 255, 0.01); transition: var(--transition-smooth);">
+            <span style="font-size: 2.2rem;">👨‍🦱</span>
+            <div>
+              <span style="font-size: 1.1rem; font-weight: bold; color: var(--text-primary); display: block;">אבא</span>
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">ניהול משימות, אישור תגמולים והגדרת הבית</span>
+            </div>
+          </div>
+          
+          <div class="wizard-role-card" data-role="child" style="display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--border-color); border-radius: var(--border-radius-md); cursor: pointer; background: rgba(255, 255, 255, 0.01); transition: var(--transition-smooth);">
+            <span style="font-size: 2.2rem;">👧👦</span>
+            <div>
+              <span style="font-size: 1.1rem; font-weight: bold; color: var(--text-primary); display: block;">ילד / משתתף</span>
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">ביצוע משימות, צבירת כוכבים וקבלת דמי כיס</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Step 2: Personal Details -->
+      <div class="wizard-step" id="wizard-step-2" style="display: none;">
+        <h2 style="font-size: 1.4rem; font-weight: 800; text-align: center; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✍️ נעים להכיר!</h2>
+        <p style="font-size: 0.95rem; color: var(--text-secondary); text-align: center; margin-bottom: 24px;">ספרו לנו קצת על עצמכם:</p>
+        
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="wizard-name">שם פרטי / כינוי</label>
+          <input type="text" id="wizard-name" class="form-control" placeholder="הכניסו את שמכם (למשל: אמא, רועי, יובל...)" required>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 24px;">
+          <label for="wizard-phone">מספר טלפון נייד</label>
+          <input type="tel" id="wizard-phone" class="form-control" placeholder="לדוגמה: 050-1234567" required>
+        </div>
+        
+        <div style="display: flex; gap: 12px; width: 100%;">
+          <button type="button" class="btn btn-secondary" id="btn-wizard-back-to-1" style="flex: 1; font-weight: bold;">חזור 👈</button>
+          <button type="button" class="btn btn-primary" id="btn-wizard-to-3" style="flex: 2; font-weight: bold;">המשך לאייקון 🚀</button>
+        </div>
+      </div>
+      
+      <!-- Step 3: Avatar Selection -->
+      <div class="wizard-step" id="wizard-step-3" style="display: none;">
+        <h2 style="font-size: 1.4rem; font-weight: 800; text-align: center; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🎨 איזה אייקון הכי מתאים לך?</h2>
+        <p style="font-size: 0.95rem; color: var(--text-secondary); text-align: center; margin-bottom: 24px;">בחרו תמונה לפרופיל או העלו תמונה אישית:</p>
+        
+        <div class="form-group" style="margin-bottom: 24px;">
+          <input type="hidden" id="wizard-profile-avatar" value="👧">
+          <input type="file" id="wizard-profile-upload" accept="image/*" style="display: none;">
+          <div class="avatar-options-grid" id="wizard-avatar-options-grid">
+            <!-- Populated in JS -->
+          </div>
+        </div>
+        
+        <div style="display: flex; gap: 12px; width: 100%;">
+          <button type="button" class="btn btn-secondary" id="btn-wizard-back-to-2" style="flex: 1; font-weight: bold;">חזור 👈</button>
+          <button type="button" class="btn btn-primary" id="btn-wizard-finish" style="flex: 2; background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; font-weight: bold;">התחל לעבוד! 🚀</button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- Google Group Creation Overlay -->
+  <div class="user-picker-overlay" id="create-google-group-overlay">
+    <div class="user-picker-modal glass-panel" style="max-width: 480px; padding: 36px 28px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(15, 23, 42, 0.95); box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <span style="font-size: 3.5rem; display: block; margin-bottom: 12px; filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.3));">⭐</span>
+      <h2 style="font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px; text-align: center;">יצירת קבוצה משפחתית בענן</h2>
+      <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.6; text-align: center; direction: rtl;">
+        ברוכים הבאים ל-StarTask! על מנת שתוכלו לנהל ולסנכרן את משימות הבית המשפחתיות שלכם בענן, יש להקים קבוצה חדשה.
+      </p>
+      
+      <form id="create-google-group-form" style="text-align: right;">
+        <div class="form-group" style="margin-bottom: 24px;">
+          <label for="create-google-group-name" style="display: block; margin-bottom: 8px; font-weight: 600;">שם הקבוצה המשפחתית (למשל: משפחת כהן)</label>
+          <input type="text" id="create-google-group-name" class="form-control" placeholder="המשפחה שלי" required style="width: 100%; text-align: center; font-size: 1.1rem; padding: 12px; background: rgba(15,23,42,0.6); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);">
+        </div>
+        <button type="submit" class="btn btn-primary" style="font-size: 1rem; font-weight: 700; padding: 14px; width: 100%; border-radius: var(--border-radius-md); box-shadow: var(--shadow-glow); background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; cursor: pointer; color: #fff;">🚀 צור קבוצה והתחל לעבוד</button>
+        <button type="button" id="create-google-group-signout-btn" class="btn btn-secondary" style="margin-top: 12px; width: 100%; font-weight: bold; padding: 12px; font-size: 0.95rem; cursor: pointer; border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.05); color: #f87171; border-radius: var(--border-radius-sm);">🚪 התנתק וחזור למצב מקומי</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Group Setup Overlay -->
   <div class="user-picker-overlay" id="group-setup-overlay">
     <div class="user-picker-modal glass-panel" style="max-width: 720px; padding: 36px 28px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(15, 23, 42, 0.95); box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
-      <span style="font-size: 3.5rem; display: block; margin-bottom: 12px; filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.3));">🏡</span>
-      <h2 style="font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; text-align: center;">ברוכים הבאים ל-CleanHome!</h2>
+      <span style="font-size: 3.5rem; display: block; margin-bottom: 12px; filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.3));">⭐</span>
+      <h2 style="font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-emerald) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; text-align: center;">ברוכים הבאים ל-StarTask!</h2>
       <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 32px; line-height: 1.6; text-align: center; direction: rtl; max-width: 500px; margin-left: auto; margin-right: auto;">
         מערכת משימות הבית המשפחתית שלך. כדי להתחיל, בחרו באחת משתי האפשרויות הבאות:
       </p>
@@ -646,7 +857,7 @@
             </p>
             <input type="text" id="input-group-name" class="form-control" placeholder="למשל: משפחת כהן" style="width: 100%; padding: 10px; border-radius: var(--border-radius-sm); font-size: 1rem; margin-bottom: 20px; border: 1px solid var(--border-color); background: rgba(15,23,42,0.6); color: var(--text-primary); text-align: center;" />
           </div>
-          <button class="btn btn-primary" id="btn-create-new-group" style="font-size: 0.95rem; font-weight: 700; padding: 12px; width: 100%; border-radius: var(--border-radius-sm); box-shadow: var(--shadow-glow); background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; cursor: pointer;">🏠 הקמת קבוצה חדשה</button>
+          <button class="btn btn-primary" id="btn-create-new-group" style="font-size: 0.95rem; font-weight: 700; padding: 12px; width: 100%; border-radius: var(--border-radius-sm); box-shadow: var(--shadow-glow); background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; cursor: pointer;">👥 צור קבוצה חדשה</button>
         </div>
         
         <!-- Option 2: Join Existing Group -->
@@ -671,8 +882,9 @@
   <!-- Load Scripts -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="mockData.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=1.0.1"></script>
 
 </body>
 </html>
