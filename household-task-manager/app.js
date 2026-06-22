@@ -368,8 +368,8 @@ function setupFirebaseListeners() {
     const tasksList = [];
     snapshot.forEach(doc => {
       const taskData = doc.data();
-      // Ensure every task is assigned to a specific family member (never 'all' or empty)
-      if (!taskData.assignedTo || taskData.assignedTo === 'all') {
+      // Ensure every task has a valid assignee or 'all'
+      if (!taskData.assignedTo) {
         const fallbackUserId = (state.users && state.users.length > 0) ? state.users[0].id : (state.currentUser ? state.currentUser.id : '');
         if (fallbackUserId) {
           taskData.assignedTo = fallbackUserId;
@@ -436,7 +436,14 @@ function updateGroupNameUI() {
   }
 }
 
+let updateTimeout = null;
 function onStateUpdated() {
+  if (updateTimeout) cancelAnimationFrame(updateTimeout);
+  updateTimeout = requestAnimationFrame(performStateUpdate);
+}
+
+function performStateUpdate() {
+  clearCompletedTodayCache();
   if (state.users.length === 0) return;
 
   const elFamilyCodeText = document.getElementById('family-code-text');
@@ -483,8 +490,6 @@ function onStateUpdated() {
         panel.classList.remove('active');
       }
     });
-
-
 
     populateAdminAssigneeSelect();
     populateTaskAssigneeFilter();
@@ -826,6 +831,25 @@ async function initApp() {
         }
       }
     });
+  }
+  if (urlParams.has('logout') || urlParams.has('clear')) {
+    const currentGroupId = localStorage.getItem('household_group_id');
+    localStorage.removeItem('household_visited');
+    localStorage.removeItem('household_current_user');
+    localStorage.removeItem('household_color_theme');
+    localStorage.removeItem('household_active_tab');
+    localStorage.removeItem('household_users');
+    localStorage.removeItem('household_tasks');
+    localStorage.removeItem('household_history');
+    localStorage.removeItem('household_user_profile');
+    if (currentGroupId) {
+      localStorage.removeItem(`household_users_${currentGroupId}`);
+      localStorage.removeItem(`household_tasks_${currentGroupId}`);
+      localStorage.removeItem(`household_history_${currentGroupId}`);
+    }
+    localStorage.removeItem('household_group_id');
+    window.location.href = window.location.pathname;
+    return;
   }
   if (urlParams.has('reset') || urlParams.has('first')) {
     const currentGroupId = localStorage.getItem('household_group_id');
@@ -1304,9 +1328,31 @@ function formatDateString(date) {
   return `${y}-${m}-${d}`;
 }
 
+let lastCompletedTodayCache = {
+  timestamp: 0,
+  set: new Set()
+};
+
+function clearCompletedTodayCache() {
+  lastCompletedTodayCache.timestamp = 0;
+}
+
 function isTaskCompletedToday(task) {
-  const todayStr = formatDateString(new Date());
-  return state.history.some(h => h.taskId === task.id && h.completedDate === todayStr && (h.action === 'completed' || h.action === undefined));
+  const now = Date.now();
+  if (now - lastCompletedTodayCache.timestamp > 1000) {
+    const todayStr = formatDateString(new Date());
+    const set = new Set();
+    state.history.forEach(h => {
+      if (h.completedDate === todayStr && (h.action === 'completed' || h.action === undefined)) {
+        set.add(h.taskId);
+      }
+    });
+    lastCompletedTodayCache = {
+      timestamp: now,
+      set: set
+    };
+  }
+  return lastCompletedTodayCache.set.has(task.id);
 }
 
 function setTaskFilter(filterName) {
@@ -1454,6 +1500,19 @@ function bindEvents() {
   const elGearBtn = document.getElementById('header-admin-gear-btn');
   if (elGearBtn && elFamilySettingsOverlay) {
     elGearBtn.addEventListener('click', () => {
+      elFamilySettingsOverlay.classList.add('active');
+      renderProfilesList();
+    });
+  }
+
+  // Button in User Switcher modal to go to User Management
+  const elGoToUserMgmtBtn = document.getElementById('btn-go-to-user-management');
+  if (elGoToUserMgmtBtn && elFamilySettingsOverlay) {
+    elGoToUserMgmtBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (elUserPickerOverlay) {
+        elUserPickerOverlay.classList.remove('active');
+      }
       elFamilySettingsOverlay.classList.add('active');
       renderProfilesList();
     });
@@ -1933,6 +1992,17 @@ function bindEvents() {
     if (state.groupId === 'local-sandbox') {
       state.tasks.push(newTask);
       state.history.push(historyEntry);
+      
+      // Email notification for Mom if task is assigned to her
+      const assignedUser = state.users.find(u => u.id === newTask.assignedTo);
+      if (assignedUser && (assignedUser.name === 'אמא' || assignedUser.id.endsWith('user-mom')) && assignedUser.email) {
+        try {
+          sendTaskCreatedEmail(newTask, assignedUser);
+        } catch (mailErr) {
+          console.error("Failed to send task creation email to Mom in local-sandbox:", mailErr);
+        }
+      }
+      
       saveState();
       const elCreateTaskOverlay = document.getElementById('create-task-overlay');
       if (elCreateTaskOverlay) {
@@ -1949,6 +2019,16 @@ function bindEvents() {
     try {
       await db.collection('tasks').doc(newTask.id).set(newTask);
       await db.collection('history').doc(historyId).set(historyEntry);
+      
+      // Email notification for Mom if task is assigned to her
+      const assignedUser = state.users.find(u => u.id === newTask.assignedTo);
+      if (assignedUser && (assignedUser.name === 'אמא' || assignedUser.id.endsWith('user-mom')) && assignedUser.email) {
+        try {
+          await sendTaskCreatedEmail(newTask, assignedUser);
+        } catch (mailErr) {
+          console.error("Failed to send task creation email to Mom:", mailErr);
+        }
+      }
     } catch (err) {
       console.error("Firebase save task failed:", err);
     }
@@ -2430,6 +2510,7 @@ function formatDateHebrew(dateStr) {
 // Populate admin options
 function populateAdminAssigneeSelect() {
   elAdminAssignee.innerHTML = '<option value="" disabled selected>בחר בן משפחה...</option>';
+  elAdminAssignee.innerHTML += `<option value="all">👥 כל בני המשפחה</option>`;
   state.users.forEach(u => {
     elAdminAssignee.innerHTML += `<option value="${u.id}">${u.name} (${u.role === 'admin' ? 'הורה' : 'ילד'})</option>`;
   });
@@ -2440,7 +2521,8 @@ function populateTaskAssigneeFilter() {
   const currentVal = elTaskAssigneeFilter.value || 'any';
   
   elTaskAssigneeFilter.innerHTML = `
-    <option value="any">👥 כל בני הבית</option>
+    <option value="any">👥 כל בני המשפחה</option>
+    <option value="all">👥 משימות לכולם</option>
   `;
   
   state.users.forEach(u => {
@@ -2508,9 +2590,10 @@ function renderTasks() {
   let filteredTasks = [];
   
   if (filter === 'my') {
-    // Tasks assigned directly to current user that are active (not completed today or completed permanently)
+    // Tasks assigned directly to current user or to 'all' (Everyone) that are active
     filteredTasks = state.tasks.filter(t => {
-      return t.assignedTo === (state.currentUser ? state.currentUser.id : '') && t.status !== 'completed' && !isTaskCompletedToday(t);
+      const isAssignedToMe = t.assignedTo === (state.currentUser ? state.currentUser.id : '') || t.assignedTo === 'all';
+      return isAssignedToMe && t.status !== 'completed' && !isTaskCompletedToday(t);
     });
   } else if (filter === 'paid') {
     // Show paid active tasks
@@ -2564,7 +2647,7 @@ function renderTasks() {
     }
     
     // Assignee details
-    let assigneeName = 'כל בני הבית';
+    let assigneeName = 'כל בני המשפחה';
     let assigneeColor = 'var(--text-muted)';
     if (task.assignedTo !== 'all') {
       const taskUser = state.users.find(u => u.id === task.assignedTo);
@@ -2772,6 +2855,65 @@ async function sendCompletionEmail(task, completedByUser) {
   }
 
   return `נשלח מייל עדכון ל${parentNames}!`;
+}
+
+async function sendTaskCreatedEmail(task, momUser) {
+  if (!momUser.email) {
+    console.warn("Mom has no email address set.");
+    return null;
+  }
+
+  const emailPayload = {
+    to: [momUser.email],
+    subject: `משימה חדשה הוקצתה לך: ${task.title}`,
+    body: `היי אמא,\n\nהוקצתה לך משימה חדשה ב-StarTask: "${task.title}".\n\nפירוט המשימה: ${task.description || 'אין פירוט נוסף.'}\n\nבהצלחה!`,
+    timestamp: new Date().toISOString()
+  };
+
+  console.log("Sending task creation email to Mom (Simulation)...", emailPayload);
+
+  try {
+    const response = await fetch('https://httpbin.org/post', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(emailPayload)
+    });
+    if (response.ok) {
+      console.log("Email dispatch API response (Simulation): success", await response.json());
+    } else {
+      console.error("Email dispatch API error status:", response.status);
+    }
+  } catch (error) {
+    console.error("Failed to fetch mock email dispatch:", error);
+  }
+
+  const todayStr = formatDateString(new Date());
+  const emailHistoryId = `${state.groupId}-hist-${Date.now()}-email`;
+  const emailHistoryEntry = {
+    id: emailHistoryId,
+    groupId: state.groupId,
+    taskId: task.id,
+    title: `נשלח מייל עדכון לאמא על משימה חדשה`,
+    action: 'email-sent',
+    reward: 0,
+    stars: 0,
+    completedBy: state.currentUser.id,
+    completedDate: todayStr,
+    timestamp: new Date().toISOString()
+  };
+
+  if (state.groupId === 'local-sandbox') {
+    state.history.push(emailHistoryEntry);
+    saveState();
+  } else if (db) {
+    try {
+      await db.collection('history').doc(emailHistoryId).set(emailHistoryEntry);
+    } catch (err) {
+      console.error("Failed to save email history log to Firestore:", err);
+    }
+  }
 }
 
 window.claimAndCompleteTask = async function(taskId) {
@@ -3304,7 +3446,7 @@ function renderProfilesList() {
           ${user.phone ? `<span class="profile-detail-phone">📱 ${user.phone}</span>` : ''}
         </div>
       </div>
-      <div style="display:flex; align-items:center; gap: 8px;">
+      <div class="admin-user-actions">
         ${inviteButtonsHTML}
         ${actionsHTML}
       </div>
@@ -3627,6 +3769,7 @@ window.triggerEditTask = function(taskId) {
   
   const selectAssignee = document.getElementById('admin-edit-task-assignee');
   selectAssignee.innerHTML = '<option value="" disabled>בחר בן משפחה...</option>';
+  selectAssignee.innerHTML += `<option value="all">👥 כל בני המשפחה</option>`;
   state.users.forEach(u => {
     selectAssignee.innerHTML += `<option value="${u.id}">${u.name} (${u.role === 'admin' ? 'הורה' : 'ילד'})</option>`;
   });
@@ -4433,7 +4576,7 @@ async function migrateLocalDataToGroup(targetGroupId, isNewGroup, groupName) {
 
 function applyTheme(themeName) {
   // Remove all theme classes first
-  document.body.classList.remove('theme-midnight', 'theme-emerald', 'theme-ocean', 'theme-sunset', 'theme-cyberpunk', 'theme-light');
+  document.body.classList.remove('theme-midnight', 'theme-emerald', 'theme-ocean', 'theme-sunset', 'theme-cyberpunk', 'theme-light', 'theme-kids');
   // Add selected theme class
   document.body.classList.add(`theme-${themeName}`);
 }

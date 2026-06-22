@@ -46,6 +46,7 @@ while ($listener.IsListening) {
             if ($ext -eq ".html") { $contentType = "text/html; charset=utf-8" }
             elseif ($ext -eq ".css") { $contentType = "text/css; charset=utf-8" }
             elseif ($ext -eq ".js") { $contentType = "application/javascript; charset=utf-8" }
+            elseif ($ext -eq ".json") { $contentType = "application/json; charset=utf-8" }
             elseif ($ext -eq ".png") { $contentType = "image/png" }
             elseif ($ext -eq ".jpg" -or $ext -eq ".jpeg") { $contentType = "image/jpeg" }
             elseif ($ext -eq ".svg") { $contentType = "image/svg+xml" }

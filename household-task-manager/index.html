@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StarTask - ניהול משימות הבית המשפחתי</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⭐</text></svg>">
-  <link rel="stylesheet" href="styles.css?v=1.0.1">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="StarTask">
+  <link rel="stylesheet" href="styles.css?v=1.0.2">
 </head>
 <body class="theme-light">
 
@@ -110,6 +117,7 @@
               <button class="theme-dot dot-ocean" data-theme="ocean" title="כחול אוקיינוס"></button>
               <button class="theme-dot dot-sunset" data-theme="sunset" title="ורד השקיעה"></button>
               <button class="theme-dot dot-cyberpunk" data-theme="cyberpunk" title="סייברפאנק ניאון"></button>
+              <button class="theme-dot dot-kids" data-theme="kids" title="סוכריית בלון (ילדים)"></button>
             </div>
           </div>
 
@@ -661,6 +669,11 @@
         <!-- Dynamically populated -->
       </div>
       <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 16px;">פרופילי הורים מוגדרים כמנהלי המערכת שיכולים לנהל פרופילים ולאפס יתרות כספיות.</p>
+      <div style="margin-top: 16px; text-align: center;">
+        <a href="#" id="btn-go-to-user-management" style="font-size: 0.9rem; color: var(--accent-purple); font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: 1.5px dashed var(--accent-purple); border-radius: 20px; transition: var(--transition-smooth); background: rgba(139, 92, 246, 0.05);">
+          ⚙️ ניהול משתמשים והגדרות משפחה
+        </a>
+      </div>
     </div>
   </div>
 
@@ -890,7 +903,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="mockData.js"></script>
-  <script src="app.js?v=1.0.1"></script>
+  <script src="app.js?v=1.0.2"></script>
 
 </body>
 </html>
