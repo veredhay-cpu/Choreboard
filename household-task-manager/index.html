@@ -12,9 +12,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="StarTask">
-  <link rel="stylesheet" href="styles.css?v=1.0.2">
+  <link rel="stylesheet" href="styles.css?v=1.1.0">
 </head>
-<body class="theme-light">
+<body class="color-white mode-light">
 
   <div class="app-container">
     
@@ -110,14 +110,29 @@
                 <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">בחירת סקין ועיצוב מועדף למערכת</p>
               </div>
             </div>
-            <div class="card-theme-selector">
-              <button class="theme-dot dot-light" data-theme="light" title="אור בהיר"></button>
-              <button class="theme-dot dot-midnight" data-theme="midnight" title="סגול חצות"></button>
-              <button class="theme-dot dot-emerald" data-theme="emerald" title="מנטה רענן"></button>
-              <button class="theme-dot dot-ocean" data-theme="ocean" title="כחול אוקיינוס"></button>
-              <button class="theme-dot dot-sunset" data-theme="sunset" title="ורד השקיעה"></button>
-              <button class="theme-dot dot-cyberpunk" data-theme="cyberpunk" title="סייברפאנק ניאון"></button>
-              <button class="theme-dot dot-kids" data-theme="kids" title="סוכריית בלון (ילדים)"></button>
+            <div class="theme-selection-container" style="display: flex; flex-direction: column; gap: 14px; width: 100%; padding-right: 68px;">
+              <!-- Color Selector Dots -->
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: bold;">צבע דגש:</span>
+                <div class="card-theme-selector" style="margin-top: 0; padding-right: 0; display: flex; gap: 12px; flex-wrap: wrap;">
+                  <button class="color-dot dot-white" data-color="white" title="לבן נקי" style="background: #ffffff; border: 1.5px solid #cbd5e1; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; transition: var(--transition-smooth);"></button>
+                  <button class="color-dot dot-purple" data-color="purple" title="סגול חצות" style="background: #8b5cf6; border: 2px solid transparent; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; transition: var(--transition-smooth);"></button>
+                  <button class="color-dot dot-emerald" data-color="emerald" title="מנטה רענן" style="background: #10b981; border: 2px solid transparent; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; transition: var(--transition-smooth);"></button>
+                  <button class="color-dot dot-ocean" data-color="ocean" title="כחול אוקיינוס" style="background: #0ea5e9; border: 2px solid transparent; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; transition: var(--transition-smooth);"></button>
+                  <button class="color-dot dot-sunset" data-color="sunset" title="ורד השקיעה" style="background: #ec4899; border: 2px solid transparent; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; transition: var(--transition-smooth);"></button>
+                  <button class="color-dot dot-orange" data-color="orange" title="כתום שמח" style="background: #fb923c; border: 2px solid transparent; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; padding: 0; transition: var(--transition-smooth);"></button>
+                </div>
+              </div>
+              
+              <!-- Mode Selection Segmented Control -->
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: bold;">סגנון תצוגה:</span>
+                <div class="mode-selector-segmented" style="display: flex; background: rgba(255, 255, 255, 0.03); padding: 4px; border-radius: 12px; border: 1px solid var(--border-color); width: 100%; max-width: 280px; gap: 4px; direction: rtl;">
+                  <button class="mode-btn" data-mode="light" style="flex: 1; padding: 6px 8px; border-radius: 8px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: var(--transition-smooth); display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">☀️ בהיר</button>
+                  <button class="mode-btn" data-mode="dark" style="flex: 1; padding: 6px 8px; border-radius: 8px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: var(--transition-smooth); display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">🌙 כהה</button>
+                  <button class="mode-btn" data-mode="kids" style="flex: 1; padding: 6px 8px; border-radius: 8px; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: var(--transition-smooth); display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">🎈 ילדים</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -903,7 +918,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="mockData.js"></script>
-  <script src="app.js?v=1.0.2"></script>
+  <script src="app.js?v=1.1.0"></script>
 
 </body>
 </html>

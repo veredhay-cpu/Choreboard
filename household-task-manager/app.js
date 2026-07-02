@@ -431,7 +431,7 @@ function updateGroupNameUI() {
       elGroupBadge.style.display = 'none';
     }
     if (elCreateBtn) {
-      elCreateBtn.style.display = 'flex';
+      elCreateBtn.style.display = 'none';
     }
   }
 }
@@ -596,7 +596,33 @@ function loadFallbackLocalData() {
   showToast("המערכת פועלת במצב מקומי (Offline Fallback) עקב שגיאת התחברות ל-Firebase", "warning");
 }
 
+const CURRENT_VERSION = '1.1.0';
+
+async function checkVersionAndBustCache() {
+  try {
+    const response = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (response.ok) {
+      const data = await response.json();
+      const serverVersion = data.version;
+      if (serverVersion && serverVersion !== CURRENT_VERSION) {
+        console.log(`[CacheBuster] New version detected: ${serverVersion} (local: ${CURRENT_VERSION}). Busting cache...`);
+        const url = new URL(window.location.href);
+        url.searchParams.set('v', serverVersion);
+        window.location.replace(url.toString());
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn("[CacheBuster] Failed to check version, proceeding normally:", err);
+  }
+  return false;
+}
+
 async function initApp() {
+  // Check version and reload if outdated to bust browser cache
+  const isReloading = await checkVersionAndBustCache();
+  if (isReloading) return;
+
   // Debug / Reset Query Param helpers
   const urlParams = new URLSearchParams(window.location.search);
 
@@ -837,6 +863,8 @@ async function initApp() {
     localStorage.removeItem('household_visited');
     localStorage.removeItem('household_current_user');
     localStorage.removeItem('household_color_theme');
+    localStorage.removeItem('household_theme_color');
+    localStorage.removeItem('household_theme_mode');
     localStorage.removeItem('household_active_tab');
     localStorage.removeItem('household_users');
     localStorage.removeItem('household_tasks');
@@ -856,6 +884,8 @@ async function initApp() {
     localStorage.removeItem('household_visited');
     localStorage.removeItem('household_current_user');
     localStorage.removeItem('household_color_theme');
+    localStorage.removeItem('household_theme_color');
+    localStorage.removeItem('household_theme_mode');
     localStorage.removeItem('household_active_tab');
     localStorage.removeItem('household_users');
     localStorage.removeItem('household_tasks');
@@ -4176,32 +4206,130 @@ window.setStarRatingValue = function(containerId, hiddenInputId, val) {
 };
 
 function initThemeSelector() {
-  const savedTheme = localStorage.getItem('household_color_theme') || 'light';
-  applyTheme(savedTheme);
+  let savedColor = localStorage.getItem('household_theme_color');
+  let savedMode = localStorage.getItem('household_theme_mode');
 
-  const themeDots = document.querySelectorAll('.theme-dot');
-  themeDots.forEach(dot => {
-    // Highlight active dot
-    if (dot.getAttribute('data-theme') === savedTheme) {
+  if (!savedColor || !savedMode) {
+    const oldTheme = localStorage.getItem('household_color_theme');
+    if (oldTheme) {
+      if (oldTheme === 'midnight') {
+        savedColor = 'purple'; savedMode = 'dark';
+      } else if (oldTheme === 'emerald') {
+        savedColor = 'emerald'; savedMode = 'light';
+      } else if (oldTheme === 'ocean') {
+        savedColor = 'ocean'; savedMode = 'light';
+      } else if (oldTheme === 'sunset') {
+        savedColor = 'sunset'; savedMode = 'light';
+      } else if (oldTheme === 'kids') {
+        savedColor = 'orange'; savedMode = 'kids';
+      } else if (oldTheme === 'cyberpunk') {
+        savedColor = 'purple'; savedMode = 'dark';
+      } else {
+        savedColor = 'white'; savedMode = 'light';
+      }
+    } else {
+      savedColor = 'white'; savedMode = 'light';
+    }
+    localStorage.setItem('household_theme_color', savedColor);
+    localStorage.setItem('household_theme_mode', savedMode);
+  }
+
+  // Prevent illegal combinations: white theme color can only be light or kids
+  if (savedColor === 'white' && savedMode !== 'kids') {
+    savedMode = 'light';
+    localStorage.setItem('household_theme_mode', 'light');
+  }
+
+  applyTheme(savedColor, savedMode);
+  updateSelectorUI(savedColor, savedMode);
+
+  // Set up event listeners for color dots
+  const colorDots = document.querySelectorAll('.color-dot');
+  colorDots.forEach(dot => {
+    dot.addEventListener('click', () => {
+      const colorVal = dot.getAttribute('data-color');
+      savedColor = colorVal;
+      
+      // If color becomes white, force mode to light (if it was dark)
+      if (savedColor === 'white' && savedMode === 'dark') {
+        savedMode = 'light';
+        localStorage.setItem('household_theme_mode', 'light');
+      }
+
+      localStorage.setItem('household_theme_color', savedColor);
+      applyTheme(savedColor, savedMode);
+      updateSelectorUI(savedColor, savedMode);
+    });
+  });
+
+  // Set up event listeners for mode buttons
+  const modeBtns = document.querySelectorAll('.mode-btn');
+  modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      // If disabled, ignore click
+      if (btn.hasAttribute('disabled') || btn.classList.contains('disabled')) return;
+      
+      const modeVal = btn.getAttribute('data-mode');
+      
+      // If color is white and we click kids while already in kids mode, toggle it off back to light mode
+      if (savedColor === 'white' && modeVal === 'kids' && savedMode === 'kids') {
+        savedMode = 'light';
+      } else {
+        savedMode = modeVal;
+      }
+      
+      localStorage.setItem('household_theme_mode', savedMode);
+      applyTheme(savedColor, savedMode);
+      updateSelectorUI(savedColor, savedMode);
+    });
+  });
+}
+
+function updateSelectorUI(activeColor, activeMode) {
+  // 1. Highlight active color dot
+  const colorDots = document.querySelectorAll('.color-dot');
+  colorDots.forEach(dot => {
+    if (dot.getAttribute('data-color') === activeColor) {
       dot.classList.add('active');
     } else {
       dot.classList.remove('active');
     }
+  });
 
-    dot.addEventListener('click', () => {
-      const themeName = dot.getAttribute('data-theme');
-      localStorage.setItem('household_color_theme', themeName);
-      applyTheme(themeName);
+  // 2. Highlight active and handle disabled state for mode buttons
+  const modeBtns = document.querySelectorAll('.mode-btn');
+  modeBtns.forEach(btn => {
+    const btnMode = btn.getAttribute('data-mode');
 
-      // Update active state of dots
-      themeDots.forEach(d => {
-        if (d.getAttribute('data-theme') === themeName) {
-          d.classList.add('active');
+    // Highlight active
+    if (btnMode === activeMode) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+
+    // Disable logic if color is white
+    if (activeColor === 'white') {
+      if (btnMode === 'dark') {
+        btn.setAttribute('disabled', 'true');
+        btn.classList.add('disabled');
+      } else if (btnMode === 'light') {
+        // If kids mode is active, allow clicking light button to toggle back to light mode
+        if (activeMode === 'kids') {
+          btn.removeAttribute('disabled');
+          btn.classList.remove('disabled');
         } else {
-          d.classList.remove('active');
+          btn.setAttribute('disabled', 'true');
+          btn.classList.add('disabled');
         }
-      });
-    });
+      } else {
+        btn.removeAttribute('disabled');
+        btn.classList.remove('disabled');
+      }
+    } else {
+      btn.removeAttribute('disabled');
+      btn.classList.remove('disabled');
+    }
   });
 }
 
@@ -4574,11 +4702,21 @@ async function migrateLocalDataToGroup(targetGroupId, isNewGroup, groupName) {
   }
 }
 
-function applyTheme(themeName) {
-  // Remove all theme classes first
-  document.body.classList.remove('theme-midnight', 'theme-emerald', 'theme-ocean', 'theme-sunset', 'theme-cyberpunk', 'theme-light', 'theme-kids');
-  // Add selected theme class
-  document.body.classList.add(`theme-${themeName}`);
+function applyTheme(color, mode) {
+  // Remove all color-* and mode-* classes
+  const classesToRemove = [];
+  document.body.classList.forEach(className => {
+    if (className.startsWith('color-') || className.startsWith('mode-') || className.startsWith('theme-')) {
+      classesToRemove.push(className);
+    }
+  });
+  classesToRemove.forEach(className => {
+    document.body.classList.remove(className);
+  });
+
+  // Add selected classes
+  document.body.classList.add(`color-${color}`);
+  document.body.classList.add(`mode-${mode}`);
 }
 
 // Google Auth Actions
