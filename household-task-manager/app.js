@@ -466,7 +466,7 @@ function performStateUpdate() {
     }
     
     let activeTab = localStorage.getItem('household_active_tab') || 'home';
-    if (state.currentUser.role !== 'admin' && activeTab === 'admin') {
+    if ((!state.currentUser || state.currentUser.role !== 'admin') && activeTab === 'admin') {
       activeTab = 'home';
       localStorage.setItem('household_active_tab', 'home');
     }
@@ -556,7 +556,7 @@ function performStateUpdate() {
 
     // New Group Onboarding Banner Logic
     const isOnboarding = localStorage.getItem('household_new_group_onboarding') === 'true';
-    if (isOnboarding && state.currentUser.role === 'admin') {
+    if (isOnboarding && state.currentUser && state.currentUser.role === 'admin') {
       if (elFamilySettingsOverlay) {
         elFamilySettingsOverlay.classList.add('active');
         renderProfilesList();
@@ -596,7 +596,7 @@ function loadFallbackLocalData() {
   showToast("המערכת פועלת במצב מקומי (Offline Fallback) עקב שגיאת התחברות ל-Firebase", "warning");
 }
 
-const CURRENT_VERSION = '1.1.0';
+const CURRENT_VERSION = '1.5.8';
 
 async function checkVersionAndBustCache() {
   try {
@@ -1535,6 +1535,25 @@ function bindEvents() {
     });
   }
 
+  // Test rewards animation buttons
+  const elTestKidsBtn = document.getElementById('btn-test-rewards-kids');
+  if (elTestKidsBtn) {
+    elTestKidsBtn.addEventListener('click', () => {
+      if (window.triggerRewardsAnimation) {
+        window.triggerRewardsAnimation(10, true);
+      }
+    });
+  }
+
+  const elTestRegularBtn = document.getElementById('btn-test-rewards-regular');
+  if (elTestRegularBtn) {
+    elTestRegularBtn.addEventListener('click', () => {
+      if (window.triggerRewardsAnimation) {
+        window.triggerRewardsAnimation(10, false);
+      }
+    });
+  }
+
   // Button in User Switcher modal to go to User Management
   const elGoToUserMgmtBtn = document.getElementById('btn-go-to-user-management');
   if (elGoToUserMgmtBtn && elFamilySettingsOverlay) {
@@ -1799,6 +1818,9 @@ function bindEvents() {
 
   const openCreateTaskModal = () => {
     // Prefill defaults
+    if (document.getElementById('admin-task-due-date')) {
+      document.getElementById('admin-task-due-date').value = '';
+    }
     if (document.getElementById('admin-recurring-hour')) {
       document.getElementById('admin-recurring-hour').value = '09';
     }
@@ -1941,8 +1963,8 @@ function bindEvents() {
     
     // Determine scheduling values
     let dayOfWeek = null;
-    let dueDate = '';
-    let time = '09:00';
+    let dueDate = document.getElementById('admin-task-due-date').value || '';
+    let time = '';
     let reminderDateTime = null;
     
     if (isRecurring) {
@@ -1959,18 +1981,13 @@ function bindEvents() {
       
       if (remDate) {
         reminderDateTime = `${remDate}T${remHour}:${remMin}`;
-        dueDate = remDate;
+        if (!dueDate) {
+          dueDate = remDate;
+        }
         if (!isRecurring) {
           time = `${remHour}:${remMin}`;
         }
-      } else {
-        reminderDateTime = null;
-        dueDate = '';
-        if (!isRecurring) time = '';
       }
-    } else if (!isRecurring) {
-      dueDate = '';
-      time = '';
     }
 
     if (!title) {
@@ -2002,6 +2019,7 @@ function bindEvents() {
       status: 'new',
       completedBy: null,
       completedDate: null,
+      createdBy: state.currentUser ? state.currentUser.id : null,
       order: state.tasks.length
     };
 
@@ -2389,12 +2407,12 @@ function selectUser(userId) {
 // Dashboard Logic
 function renderDashboard() {
   // Count stats
-  // Tasks assigned to current user, or "all" open tasks
-  const myTasks = state.tasks.filter(t => t.status !== 'completed' && t.assignedTo === state.currentUser.id && !isTaskCompletedToday(t));
+  const currentUserId = state.currentUser ? state.currentUser.id : '';
+  const myTasks = state.tasks.filter(t => t.status !== 'completed' && t.assignedTo === currentUserId && !isTaskCompletedToday(t));
   const pendingCount = myTasks.length;
   
   // Total completions by current user
-  const compCount = state.history.filter(h => h.completedBy === state.currentUser.id).length;
+  const compCount = state.history.filter(h => h.completedBy === currentUserId).length;
 
   elStatPendingTasks.textContent = pendingCount;
   elStatCompletedTasks.textContent = compCount;
@@ -2495,7 +2513,7 @@ function renderDashboard() {
     const rankEl = document.createElement('div');
     rankEl.className = 'ranking-item';
     
-    const isParent = state.currentUser.role === 'admin';
+    const isParent = state.currentUser && state.currentUser.role === 'admin';
     const canPayout = u.balance > 0;
     
     rankEl.innerHTML = `
@@ -2571,11 +2589,25 @@ function populateTaskAssigneeFilter() {
 // Tasks Panel Logic
 function renderTasks() {
   const elTasksGrid = document.getElementById('tasks-grid');
+  const elCalendarPanel = document.getElementById('calendar-panel');
   if (elTasksGrid) elTasksGrid.innerHTML = '';
 
   // Get active filter
   const activeFilterBtn = document.querySelector('.filter-btn.active');
   const filter = activeFilterBtn ? activeFilterBtn.getAttribute('data-filter') : 'my';
+
+  // Toggle calendar panel visibility vs tasks grid
+  if (elCalendarPanel) {
+    if (filter === 'calendar') {
+      elCalendarPanel.style.display = 'block';
+      if (elTasksGrid) elTasksGrid.style.display = 'none';
+      renderCalendar();
+      return; // Skip normal list rendering
+    } else {
+      elCalendarPanel.style.display = 'none';
+      if (elTasksGrid) elTasksGrid.style.display = 'grid';
+    }
+  }
 
   // Toggle assignee filter visibility: only show in "Everyone's Tasks" (all)
   const elAssigneeFilterContainer = document.getElementById('assignee-filter-container');
@@ -2600,7 +2632,7 @@ function renderTasks() {
     } else {
       const user = state.users.find(u => u.id === val);
       if (user) {
-        elBtnIcon.textContent = user.avatar || '👤'; // Show selected user's avatar
+        elBtnIcon.innerHTML = getAvatarHTML(user.avatar); // Show selected user's avatar
         elBtn.style.background = 'rgba(139, 92, 246, 0.15)'; // highlight background
         elBtn.style.borderColor = 'var(--accent-purple)'; // purple border highlight
         elBtn.title = `סנן לפי בן משפחה: ${user.name}`;
@@ -2707,7 +2739,8 @@ function renderTasks() {
 
     // Build actions based on user and task state
     let actionHTML = '';
-    const isAdmin = state.currentUser.role === 'admin';
+    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+    const canEdit = isAdmin || (state.currentUser && task.createdBy === state.currentUser.id);
 
     if (task.status !== 'completed') {
       if (task.assignedTo === 'all') {
@@ -2720,9 +2753,11 @@ function renderTasks() {
         `;
       }
 
-      actionHTML += `
-        <button class="btn btn-secondary" onclick="triggerEditTask('${task.id}')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); flex-grow: 0.5;">✏️ ערוך</button>
-      `;
+      if (canEdit) {
+        actionHTML += `
+          <button class="btn btn-secondary" onclick="triggerEditTask('${task.id}')" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); flex-grow: 0.5;">✏️ ערוך</button>
+        `;
+      }
 
       actionHTML = `
         <div style="display: flex; gap: 8px; width: 100%; flex-wrap: wrap;">
@@ -2743,12 +2778,20 @@ function renderTasks() {
           ✓ בוצע על ידי ${compUser.name}
         </span>
       `;
-      actionHTML = `
-        <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-          ${actionHTML}
-          <button class="btn btn-secondary" onclick="triggerEditTask('${task.id}')" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); width: 100%;">✏️ ערוך משימה</button>
-        </div>
-      `;
+      if (canEdit) {
+        actionHTML = `
+          <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+            ${actionHTML}
+            <button class="btn btn-secondary" onclick="triggerEditTask('${task.id}')" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); width: 100%;">✏️ ערוך משימה</button>
+          </div>
+        `;
+      } else {
+        actionHTML = `
+          <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+            ${actionHTML}
+          </div>
+        `;
+      }
     }
 
     // Format scheduling string
@@ -2954,9 +2997,74 @@ window.claimAndCompleteTask = async function(taskId) {
   }
 };
 
+let globalAudioCtx = null;
+
+function getAudioContext() {
+  if (!globalAudioCtx) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      globalAudioCtx = new AudioContext();
+    }
+  }
+  if (globalAudioCtx && globalAudioCtx.state === 'suspended') {
+    globalAudioCtx.resume();
+  }
+  return globalAudioCtx;
+}
+
+// Auto-unlock Web Audio API on very first user gesture (touch/click anywhere on screen)
+document.addEventListener('click', () => {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume();
+  }
+}, { once: true });
+document.addEventListener('touchstart', () => {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume();
+  }
+}, { once: true });
+
+function playTaskCompleteSound() {
+  try {
+    const audioCtx = getAudioContext();
+    if (audioCtx) {
+      const playNote = (freq, startTime, duration, type = 'sine', volume = 0.12) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, startTime);
+        
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(volume, startTime + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+
+      const now = audioCtx.currentTime;
+      // Duolingo-style delightful rising dual-note chime (da-ding!)
+      // Clean sine waves, highly audible, bright and extremely addictive (increased volume to 0.22)
+      playNote(783.99, now, 0.15, 'sine', 0.22); // G5 (first note)
+      playNote(1046.50, now + 0.06, 0.22, 'sine', 0.22); // C6 (second rising note, 60ms delay)
+    }
+  } catch (err) {
+    console.warn('Web Audio API blocked or not supported:', err);
+  }
+}
+
 window.triggerCompleteTask = async function(taskId) {
   const taskIndex = state.tasks.findIndex(t => t.id === taskId);
   if (taskIndex === -1) return;
+  
+  // Play the task complete deep sound feedback
+  playTaskCompleteSound();
   
   const task = state.tasks[taskIndex];
   
@@ -3045,9 +3153,20 @@ window.triggerCompleteTask = async function(taskId) {
     const starsToReward = task.stars || 0;
     if (starsToReward > 0) {
       if (user) {
-        user.stars = (user.stars || 0) + starsToReward;
+        const oldStars = user.stars || 0;
+        user.stars = oldStars + starsToReward;
         state.currentUser.stars = user.stars; // Sync active context
         showToast(`קיבלת ⭐${starsToReward} על ביצוע: ${task.title}!`, 'success');
+        
+        // Trigger rewards animation if crossed a multiple of 10
+        if (Math.floor(user.stars / 10) > Math.floor(oldStars / 10) && user.stars >= 10) {
+          setTimeout(() => {
+            if (window.triggerRewardsAnimation) {
+              const isKidsMode = (localStorage.getItem('household_theme_mode') === 'kids');
+              window.triggerRewardsAnimation(user.stars, isKidsMode);
+            }
+          }, 1200);
+        }
       }
     } else {
       showToast(`המשימה "${task.title}" הושלמה!`, 'success');
@@ -3315,7 +3434,7 @@ function renderCalendar() {
     // Show top 2 tasks as text tags, others as a "+X" count indicator
     dayTasks.slice(0, 2).forEach(task => {
       const taskTag = document.createElement('div');
-      const isAssignedToMe = task.assignedTo === state.currentUser.id;
+      const isAssignedToMe = state.currentUser && task.assignedTo === state.currentUser.id;
       taskTag.className = `calendar-task-dot ${task.assignedTo === 'all' ? 'general' : 'assigned'}`;
       taskTag.textContent = `${task.time || '09:00'} - ${task.title}`;
       tasksContainer.appendChild(taskTag);
@@ -3414,7 +3533,7 @@ function renderProfilesList() {
   if (!elAdminProfilesList) return;
   elAdminProfilesList.innerHTML = '';
 
-  const isAdmin = state.currentUser.role === 'admin';
+  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
 
   // Toggle Add Profile Form block visibility
   const elAddProfileContainer = document.getElementById('admin-add-profile-container');
@@ -3443,7 +3562,7 @@ function renderProfilesList() {
     item.className = 'admin-user-item';
     item.style.padding = '12px 16px';
     
-    const isSelf = user.id === state.currentUser.id;
+    const isSelf = state.currentUser && user.id === state.currentUser.id;
     
     // Determine action buttons based on user permissions
     let actionsHTML = '';
@@ -3552,7 +3671,7 @@ function triggerEditProfile(userId) {
   if (elRoleSelect) {
     elRoleSelect.value = user.role;
     // Disable role field if the current logged-in user is not an admin
-    elRoleSelect.disabled = (state.currentUser.role !== 'admin');
+    elRoleSelect.disabled = (!state.currentUser || state.currentUser.role !== 'admin');
   }
   
   document.getElementById('admin-edit-profile-color').value = user.color || '#8b5cf6';
@@ -3563,7 +3682,7 @@ function triggerEditProfile(userId) {
 }
 
 async function triggerDeleteProfile(userId) {
-  if (userId === state.currentUser.id) {
+  if (state.currentUser && userId === state.currentUser.id) {
     showToast('אינך יכול למחוק את הפרופיל של עצמך תוך כדי עבודה!', 'warning');
     return;
   }
@@ -3793,9 +3912,20 @@ window.triggerEditTask = function(taskId) {
   const task = state.tasks.find(t => t.id === taskId);
   if (!task) return;
 
+  const isParent = state.currentUser && state.currentUser.role === 'admin';
+  const isCreator = task.createdBy === (state.currentUser ? state.currentUser.id : '');
+  if (!isParent && !isCreator) {
+    showToast('רק הורים או יוצר המשימה רשאים לערוך אותה!', 'warning');
+    return;
+  }
+
   document.getElementById('admin-edit-task-id').value = task.id;
   document.getElementById('admin-edit-task-title').value = task.title;
   document.getElementById('admin-edit-task-desc').value = task.description || '';
+  
+  if (document.getElementById('admin-edit-task-due-date')) {
+    document.getElementById('admin-edit-task-due-date').value = task.dueDate || '';
+  }
   
   const selectAssignee = document.getElementById('admin-edit-task-assignee');
   selectAssignee.innerHTML = '<option value="" disabled>בחר בן משפחה...</option>';
@@ -3847,6 +3977,15 @@ window.triggerEditTask = function(taskId) {
     document.getElementById('admin-edit-task-reminder-minute').value = '00';
   }
 
+  const deleteBtn = document.getElementById('admin-edit-task-delete-btn');
+  if (deleteBtn) {
+    if (isParent || isCreator) {
+      deleteBtn.style.display = 'block';
+    } else {
+      deleteBtn.style.display = 'none';
+    }
+  }
+
   elEditTaskOverlay.classList.add('active');
 };
 
@@ -3873,8 +4012,8 @@ async function saveTaskEdit(e) {
   const hasReminder = document.getElementById('admin-edit-task-has-reminder').checked;
   
   let dayOfWeek = null;
-  let dueDate = '';
-  let time = '09:00';
+  let dueDate = document.getElementById('admin-edit-task-due-date').value || '';
+  let time = '';
   let reminderDateTime = null;
   
   if (isRecurring) {
@@ -3891,22 +4030,24 @@ async function saveTaskEdit(e) {
     
     if (remDate) {
       reminderDateTime = `${remDate}T${remHour}:${remMin}`;
-      dueDate = remDate;
+      if (!dueDate) {
+        dueDate = remDate;
+      }
       if (!isRecurring) {
         time = `${remHour}:${remMin}`;
       }
-    } else {
-      reminderDateTime = null;
-      dueDate = '';
-      if (!isRecurring) time = '';
     }
-  } else if (!isRecurring) {
-    dueDate = '';
-    time = '';
   }
 
   const task = state.tasks.find(t => t.id === id);
   if (task) {
+    const isParent = state.currentUser && state.currentUser.role === 'admin';
+    const isCreator = task.createdBy === (state.currentUser ? state.currentUser.id : '');
+    if (!isParent && !isCreator) {
+      showToast('אין לך הרשאה לערוך משימה זו!', 'warning');
+      return;
+    }
+
     const oldStatus = task.status;
     
     task.title = title;
@@ -4036,6 +4177,13 @@ async function saveTaskEdit(e) {
 async function deleteTask(taskId) {
   const task = state.tasks.find(t => t.id === taskId);
   if (!task) return;
+  
+  const isParent = state.currentUser && state.currentUser.role === 'admin';
+  const isCreator = task.createdBy === (state.currentUser ? state.currentUser.id : '');
+  if (!isParent && !isCreator) {
+    showToast('רק הורים או יוצר המשימה רשאים למחוק אותה!', 'warning');
+    return;
+  }
   
   const confirmDelete = confirm(`האם אתה בטוח שברצונך למחוק את המשימה "${task.title}"?`);
   if (!confirmDelete) return;
@@ -4228,7 +4376,7 @@ function initThemeSelector() {
         savedColor = 'white'; savedMode = 'light';
       }
     } else {
-      savedColor = 'white'; savedMode = 'light';
+      savedColor = 'purple'; savedMode = 'light';
     }
     localStorage.setItem('household_theme_color', savedColor);
     localStorage.setItem('household_theme_mode', savedMode);
@@ -4313,15 +4461,6 @@ function updateSelectorUI(activeColor, activeMode) {
       if (btnMode === 'dark') {
         btn.setAttribute('disabled', 'true');
         btn.classList.add('disabled');
-      } else if (btnMode === 'light') {
-        // If kids mode is active, allow clicking light button to toggle back to light mode
-        if (activeMode === 'kids') {
-          btn.removeAttribute('disabled');
-          btn.classList.remove('disabled');
-        } else {
-          btn.setAttribute('disabled', 'true');
-          btn.classList.add('disabled');
-        }
       } else {
         btn.removeAttribute('disabled');
         btn.classList.remove('disabled');
@@ -4752,6 +4891,311 @@ async function signOutUser() {
     console.error("Sign out failed:", error);
     showToast(`שגיאת התנתקות: ${error.message}`, 'warning');
   }
+}
+
+window.closeRewardsCelebration = function() {
+  const overlay = document.getElementById('rewards-celebration-overlay');
+  const modal = overlay ? overlay.querySelector('.rewards-modal') : null;
+  const chest = document.getElementById('rewards-chest-box');
+  const mascot = document.getElementById('mascot-celebrating');
+  
+  // Clean up resize listener to prevent memory leaks and lag!
+  if (window._rewardsResizeHandler) {
+    window.removeEventListener('resize', window._rewardsResizeHandler);
+    window._rewardsResizeHandler = null;
+  }
+
+  if (overlay) {
+    overlay.style.opacity = '0';
+    if (modal) {
+      modal.style.transform = 'scale(0.8) translateY(50px)';
+    }
+    
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      if (chest) {
+        chest.innerText = '🎁';
+        chest.style.animation = '';
+        chest.style.opacity = '1';
+        chest.style.transform = 'scale(1)';
+        chest.style.display = 'block';
+      }
+      if (mascot) {
+        mascot.style.display = 'block';
+        mascot.style.transform = 'scale(1)';
+        mascot.style.animation = '';
+      }
+    }, 400);
+  }
+  
+  if (window._rewardsAnimFrame) {
+    cancelAnimationFrame(window._rewardsAnimFrame);
+  }
+};
+
+window.triggerRewardsAnimation = function(starsCount, isKidsMode) {
+  if (isKidsMode === undefined) {
+    isKidsMode = (localStorage.getItem('household_theme_mode') === 'kids');
+  }
+
+  const overlay = document.getElementById('rewards-celebration-overlay');
+  const modal = overlay ? overlay.querySelector('.rewards-modal') : null;
+  const canvas = document.getElementById('rewards-canvas');
+  const mascot = document.getElementById('mascot-celebrating');
+  const chest = document.getElementById('rewards-chest-box');
+  const title = document.getElementById('rewards-title');
+  const subtitle = document.getElementById('rewards-subtitle');
+  const closeBtn = document.getElementById('btn-close-rewards');
+  
+  if (!overlay || !canvas) return;
+
+  // Play dynamic celebratory sound arpeggio (Web Audio API - pure harmonics, no harsh noise!)
+  try {
+    const audioCtx = getAudioContext();
+    if (audioCtx) {
+      const playNote = (freq, startTime, duration, type = 'sine', volume = 0.12) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, startTime);
+        
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(volume, startTime + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+
+      const now = audioCtx.currentTime;
+      
+      // --- PREMIUM AMBIENT GLASS CHIME (Apple/Slack Style) ---
+      // Plays unconditionally for both Kids and Regular modes for a premium, unified experience!
+      const chordDuration = 3.5;
+      
+      // Deep warm fundamentals (sine waves)
+      playNote(261.63, now, chordDuration, 'sine', 0.10);  // C4
+      playNote(392.00, now, chordDuration, 'sine', 0.08);  // G4
+      playNote(523.25, now, chordDuration, 'sine', 0.08);  // C5
+      playNote(659.25, now, chordDuration, 'sine', 0.06);  // E5
+      playNote(783.99, now, chordDuration, 'sine', 0.06);  // G5
+      
+      // Sparkling high-bell crystalline chime delay (gives the "magic strike" feel)
+      const chimeDelay = 0.06;
+      playNote(1046.50, now + chimeDelay, 3.0, 'sine', 0.06); // C6
+      playNote(1318.51, now + chimeDelay, 3.0, 'sine', 0.05); // E6
+      playNote(1567.98, now + chimeDelay, 3.0, 'sine', 0.05); // G6
+      playNote(2093.00, now + chimeDelay, 2.5, 'sine', 0.04); // C7
+      playNote(2637.02, now + chimeDelay + 0.04, 2.0, 'sine', 0.03); // E7 (ultra-high shimmer)
+    }
+  } catch (err) {
+    console.warn('Web Audio API not supported or blocked:', err);
+  }
+
+  // Set up titles and texts based on mode
+  if (title) {
+    title.innerText = isKidsMode ? 'כל הכבוד! 🌟' : 'הישג חדש! 🏆';
+    title.style.background = isKidsMode 
+      ? 'linear-gradient(135deg, #f59e0b 0%, #ec4899 100%)'
+      : 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)';
+    title.style.webkitBackgroundClip = 'text';
+    title.style.webkitTextFillColor = 'transparent';
+  }
+
+  if (subtitle) {
+    if (isKidsMode) {
+      subtitle.innerHTML = `צברת עוד 10 כוכבים במערכת! 🎉<br>סך הכל יש לך <strong>${starsCount} כוכבים</strong>! 🏆`;
+    } else {
+      subtitle.innerHTML = `השלמת משימות והגעת ל-10 כוכבים נוספים.<br>סך הכל יש לך <strong>${starsCount} כוכבים</strong>. המשך כך! 🌟`;
+    }
+  }
+
+  if (closeBtn) {
+    closeBtn.innerHTML = isKidsMode ? 'איזה כיף! 🎉' : 'המשך לעבוד 🚀';
+    closeBtn.style.background = isKidsMode
+      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+      : 'linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%)';
+    closeBtn.style.boxShadow = isKidsMode
+      ? '0 4px 15px rgba(16, 185, 129, 0.3)'
+      : '0 4px 15px rgba(124, 58, 237, 0.3)';
+  }
+
+  // Configure mascot & chest display based on mode
+  if (chest) {
+    if (isKidsMode) {
+      chest.style.display = 'block';
+      const kidsIcons = ['🎁', '🎈', '🏆', '⭐', '🍭', '🍬', '🍿'];
+      chest.innerText = kidsIcons[Math.floor(Math.random() * kidsIcons.length)];
+      chest.style.opacity = '1';
+      chest.style.transform = 'scale(1)';
+      chest.style.animation = 'chestShake 0.8s ease-in-out';
+    } else {
+      chest.style.display = 'none';
+    }
+  }
+
+  if (mascot) {
+    if (isKidsMode) {
+      mascot.style.display = 'none'; // Hidden initially in kids mode!
+      mascot.style.transform = 'scale(0.3)';
+    } else {
+      mascot.style.display = 'block';
+      mascot.style.transform = 'scale(1)';
+      mascot.innerText = '🏆';
+      mascot.style.animation = 'mascotBounce 4s infinite ease-in-out';
+    }
+  }
+
+  // Make sure elements are visible
+  overlay.style.display = 'flex';
+  setTimeout(() => {
+    overlay.style.opacity = '1';
+    if (modal) {
+      modal.style.transform = 'scale(1) translateY(0)';
+    }
+  }, 50);
+
+  // Set up Canvas dimensions and prevent event listener leaks
+  if (window._rewardsResizeHandler) {
+    window.removeEventListener('resize', window._rewardsResizeHandler);
+  }
+  
+  const ctx = canvas.getContext('2d');
+  
+  function resizeCanvas() {
+    // Moderate downscale on high-DPI screens to boost pixel fill performance
+    const canvasScale = window.devicePixelRatio > 1 ? 0.75 : 1.0;
+    canvas.width = window.innerWidth * canvasScale;
+    canvas.height = window.innerHeight * canvasScale;
+    ctx.scale(canvasScale, canvasScale);
+  }
+  
+  resizeCanvas();
+  window._rewardsResizeHandler = resizeCanvas;
+  window.addEventListener('resize', resizeCanvas);
+
+  // Choose colors: rainbow vs gold/metallic
+  const colors = isKidsMode 
+    ? ['#f59e0b', '#fb923c', '#ec4899', '#3b82f6', '#10b981', '#a855f7']
+    : ['#d97706', '#f59e0b', '#fbbf24', '#fef08a', '#e2e8f0', '#cbd5e1'];
+
+  // Particle System
+  let particles = [];
+
+  // Chest animation timeline / particle trigger
+  if (isKidsMode && chest) {
+    setTimeout(() => {
+      // Keep the gift icon (same icon!), transition it from shaking to bouncing gently
+      chest.style.animation = 'mascotBounce 2.5s infinite ease-in-out';
+      spawnParticles();
+    }, 800);
+  } else {
+    spawnParticles();
+  }
+
+  function spawnParticles() {
+    if (!modal) return;
+    const rect = modal.getBoundingClientRect();
+    const startX = rect.left + rect.width / 2;
+    const startY = rect.top + 80;
+    
+    const count = isKidsMode ? 32 : 24;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = isKidsMode ? (6 + Math.random() * 12) : (5 + Math.random() * 10);
+      particles.push({
+        x: startX,
+        y: startY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - (isKidsMode ? (6 + Math.random() * 8) : (5 + Math.random() * 6)),
+        size: isKidsMode ? (7 + Math.random() * 10) : (6 + Math.random() * 8),
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 0.15,
+        alpha: 1,
+        decay: isKidsMode ? (0.008 + Math.random() * 0.012) : (0.006 + Math.random() * 0.01),
+        type: Math.random() > 0.4 ? 'star' : 'circle'
+      });
+    }
+  }
+
+  // Pre-calculate star vertices
+  const STAR_VERTICES = [];
+  let starRot = Math.PI / 2 * 3;
+  const starStep = Math.PI / 5;
+  for (let i = 0; i < 5; i++) {
+    STAR_VERTICES.push({ x: Math.cos(starRot), y: Math.sin(starRot) });
+    starRot += starStep;
+    STAR_VERTICES.push({ x: Math.cos(starRot) * 0.5, y: Math.sin(starRot) * 0.5 });
+    starRot += starStep;
+  }
+
+  function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    let active = false;
+    // Backward loop allows splicing dead particles without leaving undefined elements or performance lag!
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.alpha -= p.decay;
+      if (p.alpha <= 0) {
+        particles.splice(i, 1);
+        continue;
+      }
+      
+      active = true;
+      p.x += p.vx;
+      p.y += p.vy;
+      
+      // Apply friction to both axes so they slow down smoothly
+      p.vx *= 0.96;
+      p.vy *= 0.96;
+      
+      if (isKidsMode) {
+        p.vy += 0.15; // Gravity only for kids mode confetti
+      }
+      p.rotation += p.rotationSpeed;
+
+      if (p.type === 'star') {
+        const cos = Math.cos(p.rotation);
+        const sin = Math.sin(p.rotation);
+        const r = p.size;
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        
+        // Fast draw using direct math coordinates (no heavy translate/rotate state changes)
+        ctx.beginPath();
+        const vx0 = STAR_VERTICES[0].x * r;
+        const vy0 = STAR_VERTICES[0].y * r;
+        ctx.moveTo(p.x + (vx0 * cos - vy0 * sin), p.y + (vx0 * sin + vy0 * cos));
+        for (let j = 1; j < 10; j++) {
+          const vxj = STAR_VERTICES[j].x * r;
+          const vyj = STAR_VERTICES[j].y * r;
+          ctx.lineTo(p.x + (vxj * cos - vyj * sin), p.y + (vxj * sin + vyj * cos));
+        }
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (active && particles.length > 0) {
+      window._rewardsAnimFrame = requestAnimationFrame(update);
+    }
+  }
+
+  setTimeout(() => {
+    update();
+  }, isKidsMode ? 800 : 50);
 }
 
 // Start application
