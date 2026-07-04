@@ -596,7 +596,7 @@ function loadFallbackLocalData() {
   showToast("המערכת פועלת במצב מקומי (Offline Fallback) עקב שגיאת התחברות ל-Firebase", "warning");
 }
 
-const CURRENT_VERSION = '1.5.8';
+const CURRENT_VERSION = '1.6.0';
 
 async function checkVersionAndBustCache() {
   try {
