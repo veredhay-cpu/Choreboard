@@ -218,6 +218,7 @@ let state = {
   users: [],
   tasks: [],
   history: [],
+  notifications: [],
   currentUser: null
 };
 
@@ -241,6 +242,13 @@ function loadLocalState() {
   const users = localStorage.getItem(`household_users${groupSuffix}`);
   const tasks = localStorage.getItem(`household_tasks${groupSuffix}`);
   const history = localStorage.getItem(`household_history${groupSuffix}`);
+  const notifications = localStorage.getItem(`household_notifications${groupSuffix}`);
+  
+  if (notifications) {
+    state.notifications = JSON.parse(notifications);
+  } else {
+    state.notifications = [];
+  }
   
   if (users) {
     state.users = JSON.parse(users);
@@ -311,6 +319,7 @@ function loadLocalState() {
       }
     }
     localStorage.setItem(`household_history${groupSuffix}`, JSON.stringify(state.history));
+    localStorage.setItem(`household_notifications${groupSuffix}`, JSON.stringify(state.notifications));
   }
 }
 
@@ -322,6 +331,7 @@ function saveLocalFallbackState() {
   localStorage.setItem(`household_users${groupSuffix}`, JSON.stringify(state.users));
   localStorage.setItem(`household_tasks${groupSuffix}`, JSON.stringify(state.tasks));
   localStorage.setItem(`household_history${groupSuffix}`, JSON.stringify(state.history));
+  localStorage.setItem(`household_notifications${groupSuffix}`, JSON.stringify(state.notifications));
 }
 
 let isInitialLoad = true;
@@ -403,9 +413,82 @@ function setupFirebaseListeners() {
     console.error("Firebase History Listener Error:", error);
     showFirebaseErrorAlert("קבלת היסטוריה", error);
   });
+
+  db.collection('notifications').where('groupId', '==', state.groupId).onSnapshot(snapshot => {
+    const notificationsList = [];
+    snapshot.forEach(doc => {
+      notificationsList.push(doc.data());
+    });
+    // Sort descending by timestamp
+    notificationsList.sort((a, b) => b.timestamp - a.timestamp);
+    state.notifications = notificationsList;
+    onStateUpdated();
+  }, error => {
+    console.error("Firebase Notifications Listener Error:", error);
+  });
+}
+
+function getConnectedGroups() {
+  try {
+    const data = localStorage.getItem('household_connected_groups');
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    console.error("Failed to parse connected groups:", e);
+    return [];
+  }
+}
+
+function addConnectedGroup(groupId, groupName) {
+  if (!groupId || groupId === 'local-sandbox') return;
+  const groups = getConnectedGroups();
+  const existing = groups.find(g => g.id === groupId);
+  if (existing) {
+    if (existing.name !== groupName && groupName) {
+      existing.name = groupName;
+      localStorage.setItem('household_connected_groups', JSON.stringify(groups));
+    }
+  } else {
+    groups.push({ id: groupId, name: groupName || groupId });
+    localStorage.setItem('household_connected_groups', JSON.stringify(groups));
+  }
 }
 
 function updateGroupNameUI() {
+  if (state.groupId && state.groupId !== 'local-sandbox' && state.groupName) {
+    addConnectedGroup(state.groupId, state.groupName);
+  }
+  
+  const groups = getConnectedGroups();
+  const elFamilyName = document.getElementById('header-family-name');
+  const elFamilySelect = document.getElementById('header-family-select');
+  
+  if (elFamilyName && elFamilySelect) {
+    if (groups.length > 1) {
+      elFamilyName.style.display = 'none';
+      elFamilySelect.style.display = 'inline-block';
+      
+      const currentOptions = Array.from(elFamilySelect.options).map(o => o.value).join(',');
+      const newOptions = groups.map(g => g.id).join(',');
+      
+      if (currentOptions !== newOptions) {
+        elFamilySelect.innerHTML = '';
+        groups.forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g.id;
+          opt.textContent = g.name || g.id;
+          opt.selected = (g.id === state.groupId);
+          elFamilySelect.appendChild(opt);
+        });
+      } else {
+        elFamilySelect.value = state.groupId;
+      }
+    } else {
+      elFamilyName.style.display = 'inline';
+      elFamilySelect.style.display = 'none';
+      elFamilyName.textContent = state.groupName || 'המשפחה שלי';
+    }
+  }
+
   const elSubtitle = document.querySelector('.logo-section p');
   if (elSubtitle && state.groupName) {
     elSubtitle.textContent = `קבוצה משפחתית: ${state.groupName}`;
@@ -579,6 +662,11 @@ function performStateUpdate() {
   renderDashboard();
   renderTasks();
   renderAdminPanel();
+
+  const elInboxOverlay = document.getElementById('inbox-overlay');
+  if (elInboxOverlay && elInboxOverlay.classList.contains('active')) {
+    renderInbox();
+  }
 }
 
 // Fallback function to load local data if Firebase configuration is missing or broken
@@ -596,7 +684,7 @@ function loadFallbackLocalData() {
   showToast("המערכת פועלת במצב מקומי (Offline Fallback) עקב שגיאת התחברות ל-Firebase", "warning");
 }
 
-const CURRENT_VERSION = '1.6.0';
+const CURRENT_VERSION = '1.6.8';
 
 async function checkVersionAndBustCache() {
   try {
@@ -897,6 +985,7 @@ async function initApp() {
       localStorage.removeItem(`household_history_${currentGroupId}`);
     }
     localStorage.removeItem('household_group_id');
+    localStorage.removeItem('household_connected_groups');
     
     if (currentGroupId && currentGroupId !== 'local-sandbox' && db) {
       try {
@@ -924,12 +1013,73 @@ async function initApp() {
     return;
   }
 
-  // Onboarding Profile Wizard Check
+  // Onboarding Profile Wizard / Welcome Overlay Check
+  const hasVisited = localStorage.getItem('household_visited') === 'true';
   const savedProfile = localStorage.getItem('household_user_profile');
   const savedGroupId = localStorage.getItem('household_group_id');
+  if (!hasVisited && !groupParam) {
+    // FIRST LANDING (Clean Entry):
+    // 1. Initialize default sandbox profiles in memory/localStorage so background looks beautiful
+    const defaultMom = {
+      id: 'user-mom',
+      name: 'אמא',
+      role: 'admin',
+      avatar: '👩‍🦰',
+      color: '#ec4899',
+      balance: 0,
+      stars: 0,
+      groupId: 'local-sandbox',
+      email: '',
+      phone: ''
+    };
+    const defaultUsers = [
+      defaultMom,
+      { id: 'user-dad', name: 'אבא', role: 'admin', avatar: '👨‍🦱', color: '#3b82f6', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' },
+      { id: 'user-kid1', name: 'ילד 1', role: 'member', avatar: '👦', color: '#10b981', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' },
+      { id: 'user-kid2', name: 'ילד 2', role: 'member', avatar: '👧', color: '#f59e0b', balance: 0, stars: 0, groupId: 'local-sandbox', email: '', phone: '' }
+    ];
+    
+    localStorage.setItem('household_users_local-sandbox', JSON.stringify(defaultUsers));
+    localStorage.setItem('household_user_profile', JSON.stringify(defaultMom));
+    localStorage.setItem('household_current_user', 'user-mom');
+    localStorage.setItem('household_group_id', 'local-sandbox');
+    localStorage.setItem('household_active_tab', 'home');
+    
+    state.groupId = 'local-sandbox';
+    state.currentUser = defaultMom;
+    state.users = defaultUsers;
+    
+    // Ensure onboarding overlays are hidden, but SHOW welcome-overlay
+    const welcomeOverlay = document.getElementById('welcome-overlay');
+    if (welcomeOverlay) {
+      welcomeOverlay.classList.add('active');
+    }
+    
+    const groupSetupOverlay = document.getElementById('group-setup-overlay');
+    if (groupSetupOverlay) groupSetupOverlay.classList.remove('active');
+    
+    const onboardingOverlay = document.getElementById('onboarding-wizard-overlay');
+    if (onboardingOverlay) onboardingOverlay.style.display = 'none';
+    
+    // Initialize Theme Selector
+    initThemeSelector();
+    
+    // Load local state & bind basic events
+    loadLocalState();
+    bindEvents();
+    
+    // Bind Welcome Overlay specific actions
+    initWelcomeOverlayEvents();
+    
+    // Bind group setup handlers for banner/settings
+    initGroupSetupHandlers();
+    
+    isInitialLoad = true;
+    onStateUpdated();
+    return;
+  }
   
   if (!savedProfile && (!savedGroupId || savedGroupId === 'local-sandbox')) {
-    // FIRST ENTRY (Bypassing wizard entirely):
     const defaultMom = {
       id: 'user-mom',
       name: 'אמא',
@@ -961,25 +1111,18 @@ async function initApp() {
     state.currentUser = defaultMom;
     state.users = defaultUsers;
     
-    // Hide standard overlays
     const welcomeOverlay = document.getElementById('welcome-overlay');
     if (welcomeOverlay) welcomeOverlay.classList.remove('active');
     
     const groupSetupOverlay = document.getElementById('group-setup-overlay');
     if (groupSetupOverlay) groupSetupOverlay.classList.remove('active');
     
-    // Ensure onboarding wizard overlay is hidden
     const onboardingOverlay = document.getElementById('onboarding-wizard-overlay');
     if (onboardingOverlay) onboardingOverlay.style.display = 'none';
     
-    // Initialize Theme Selector
     initThemeSelector();
-    
-    // Load local state & bind basic events
     loadLocalState();
     bindEvents();
-    
-    // Bind group setup handlers for banner/settings
     initGroupSetupHandlers();
     
     isInitialLoad = true;
@@ -1449,10 +1592,22 @@ function updateProfileUI() {
   // Highlight active user and update active balance indicator in dashboard
   elStatActiveBalance.textContent = `₪${state.currentUser.balance}`;
 
-  // Toggle Header Admin Gear Button for all family members
-  const elHeaderAdminGearBtn = document.getElementById('header-admin-gear-btn');
-  if (elHeaderAdminGearBtn) {
-    elHeaderAdminGearBtn.style.display = 'flex';
+  // Toggle Header Inbox Button
+  const elHeaderInboxBtn = document.getElementById('header-inbox-btn');
+  if (elHeaderInboxBtn) {
+    elHeaderInboxBtn.style.display = 'flex';
+  }
+
+  // Update Inbox unread badge
+  const unreadCount = state.notifications ? state.notifications.filter(n => {
+    const isRecipient = n.recipientId === state.currentUser.id || (state.currentUser.role === 'admin' && n.recipientId === 'admin');
+    const isUnread = !n.readBy || !n.readBy.includes(state.currentUser.id);
+    return isRecipient && isUnread;
+  }).length : 0;
+
+  const elInboxBadge = document.getElementById('inbox-badge');
+  if (elInboxBadge) {
+    elInboxBadge.style.display = unreadCount > 0 ? 'block' : 'none';
   }
 
   // Navigation Add Task button removed
@@ -1515,6 +1670,21 @@ function switchTab(targetTab) {
 }
 
 function bindEvents() {
+  // Family selector combobox listener
+  const elFamilySelect = document.getElementById('header-family-select');
+  if (elFamilySelect) {
+    elFamilySelect.addEventListener('change', (e) => {
+      if (!e.isTrusted) return; // Prevent loop caused by programmatic option rebuilding
+      const targetGroupId = e.target.value;
+      if (targetGroupId && targetGroupId !== state.groupId) {
+        localStorage.setItem('household_group_id', targetGroupId);
+        localStorage.removeItem('household_current_user');
+        localStorage.removeItem('household_user_profile');
+        window.location.reload();
+      }
+    });
+  }
+
   // Google Sign-In and Sign-Out event listeners
   const elGoogleLoginBtn = document.getElementById('settings-google-login-btn');
   if (elGoogleLoginBtn) {
@@ -1526,12 +1696,39 @@ function bindEvents() {
     elGoogleSignoutBtn.addEventListener('click', signOutUser);
   }
 
-  // Header Admin Settings Gear click - opens the Settings Modal
+  // Header Admin Settings Gear click - opens the Settings Modal (retained in JS for references)
   const elGearBtn = document.getElementById('header-admin-gear-btn');
   if (elGearBtn && elFamilySettingsOverlay) {
     elGearBtn.addEventListener('click', () => {
       elFamilySettingsOverlay.classList.add('active');
       renderProfilesList();
+    });
+  }
+
+  // Header Inbox button click
+  const elInboxBtn = document.getElementById('header-inbox-btn');
+  const elInboxOverlay = document.getElementById('inbox-overlay');
+  const elInboxCloseBtn = document.getElementById('inbox-close-btn');
+
+  if (elInboxBtn && elInboxOverlay) {
+    elInboxBtn.addEventListener('click', () => {
+      elInboxOverlay.classList.add('active');
+      renderInbox();
+      markNotificationsAsRead();
+    });
+  }
+
+  if (elInboxCloseBtn && elInboxOverlay) {
+    elInboxCloseBtn.addEventListener('click', () => {
+      elInboxOverlay.classList.remove('active');
+    });
+  }
+
+  if (elInboxOverlay) {
+    elInboxOverlay.addEventListener('click', (e) => {
+      if (e.target === elInboxOverlay) {
+        elInboxOverlay.classList.remove('active');
+      }
     });
   }
 
@@ -3856,6 +4053,224 @@ function checkTaskReminders() {
       }
     }
   });
+
+  // Trigger inbox notification checking loops
+  checkStarMilestoneNotifications();
+  checkDeadlineNotifications();
+}
+
+async function sendNotification(recipientId, type, title, text, color, refId = null) {
+  // Prevent duplicate notifications if refId is provided
+  if (refId && state.notifications && state.notifications.some(n => n.refId === refId)) {
+    return;
+  }
+
+  const notifId = `${state.groupId}-notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const notif = {
+    id: notifId,
+    groupId: state.groupId,
+    recipientId: recipientId,
+    type: type,
+    title: title,
+    text: text,
+    color: color,
+    timestamp: Date.now(),
+    readBy: [],
+    refId: refId
+  };
+
+  if (state.groupId === 'local-sandbox' || !firebaseLoaded) {
+    if (!state.notifications) state.notifications = [];
+    state.notifications.unshift(notif);
+    saveLocalFallbackState();
+    onStateUpdated();
+  } else {
+    try {
+      await db.collection('notifications').doc(notifId).set(notif);
+    } catch (err) {
+      console.error("Firebase sendNotification failed:", err);
+      if (!state.notifications) state.notifications = [];
+      state.notifications.unshift(notif);
+      saveLocalFallbackState();
+      onStateUpdated();
+    }
+  }
+}
+
+function checkStarMilestoneNotifications() {
+  if (!state.users) return;
+  state.users.forEach(user => {
+    const starMilestones = Math.floor((user.stars || 0) / 10);
+    for (let i = 1; i <= starMilestones; i++) {
+      const milestone = i * 10;
+      
+      if (user.role !== 'admin') {
+        // Kid achievement: green notification for kid, blue for parents
+        const kidRefId = `stars-${user.id}-${milestone}-kid`;
+        sendNotification(user.id, 'achievement', 'הישג חדש! 🌟', `כל הכבוד! צברת ${milestone} כוכבים במערכת!`, 'green', kidRefId);
+        
+        const parentRefId = `stars-${user.id}-${milestone}-parent`;
+        sendNotification('admin', 'kid-achievement', `הישג חדש ל-${user.name}! 🌟`, `הילד/ה ${user.name} צבר/ה ${milestone} כוכבים במערכת!`, 'blue', parentRefId);
+      } else {
+        // Parent achievement: green notification for parent self
+        const parentSelfRefId = `stars-${user.id}-${milestone}-parent-self`;
+        sendNotification(user.id, 'achievement', 'הישג אישי! 🏆', `כל הכבוד! צברת ${milestone} כוכבים במערכת!`, 'green', parentSelfRefId);
+      }
+    }
+  });
+}
+
+function checkDeadlineNotifications() {
+  if (!state.tasks || !state.users) return;
+  const now = Date.now();
+  
+  state.tasks.forEach(task => {
+    if (task.status === 'completed' || isTaskCompletedToday(task)) return;
+    if (!task.dueDate) return; // Only check tasks with a due date
+    
+    // Parse deadline
+    const deadlineStr = `${task.dueDate}T${task.time || '12:00'}`;
+    const deadlineDate = new Date(deadlineStr);
+    if (isNaN(deadlineDate.getTime())) return;
+    
+    const diffMs = deadlineDate.getTime() - now;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    // Missed deadline (overdue) - red color
+    if (diffMs < 0) {
+      if (task.assignedTo !== 'all') {
+        const assignee = state.users.find(u => u.id === task.assignedTo);
+        if (assignee) {
+          if (assignee.role !== 'admin') {
+            // Kid assignee overdue
+            const kidRefId = `missed-kid-${task.id}`;
+            sendNotification(assignee.id, 'missed-deadline', 'משימה עברה את מועד היעד ⏰', `לא סיימת את המשימה "${task.title}" בזמן.`, 'red', kidRefId);
+            
+            const parentRefId = `missed-parent-${task.id}`;
+            sendNotification('admin', 'missed-deadline', `משימה עברה את המועד: ${assignee.name} ⏰`, `הילד/ה ${assignee.name} לא סיים/ה את המשימה "${task.title}" בזמן.`, 'red', parentRefId);
+          } else {
+            // Adult assignee overdue
+            const adultRefId = `missed-adult-${task.id}`;
+            sendNotification(assignee.id, 'missed-deadline', 'משימה עברה את מועד היעד ⏰', `לא סיימת את המשימה "${task.title}" בזמן.`, 'red', adultRefId);
+            
+            // Check if creator was a kid (to notify them)
+            if (task.createdBy) {
+              const creator = state.users.find(u => u.id === task.createdBy);
+              if (creator && creator.role !== 'admin') {
+                sendNotification(creator.id, 'missed-deadline', `משימה עברה את המועד: ${assignee.name} ⏰`, `${assignee.name} לא סיים/ה את המשימה "${task.title}" בזמן.`, 'red', `missed-adult-creator-${task.id}`);
+              }
+            }
+          }
+        }
+      }
+    }
+    // Upcoming deadline (within 1 hour) - orange color
+    else if (diffHours > 0 && diffHours <= 1) {
+      if (task.assignedTo !== 'all') {
+        const assignee = state.users.find(u => u.id === task.assignedTo);
+        if (assignee) {
+          if (assignee.role !== 'admin') {
+            // Send orange notification to kid
+            const kidRefId = `upcoming-kid-${task.id}`;
+            sendNotification(assignee.id, 'upcoming-deadline', 'משימה מסתיימת בקרוב ⏳', `נותרה שעה אחת בלבד לסיום המשימה: "${task.title}"`, 'orange', kidRefId);
+          } else {
+            // Send orange notification to adult
+            const adultRefId = `upcoming-adult-${task.id}`;
+            sendNotification(assignee.id, 'upcoming-deadline', 'משימה מסתיימת בקרוב ⏳', `נותרה שעה אחת בלבד לסיום המשימה: "${task.title}"`, 'orange', adultRefId);
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderInbox() {
+  const elList = document.getElementById('inbox-notifications-list');
+  if (!elList) return;
+  elList.innerHTML = '';
+
+  if (!state.currentUser) {
+    elList.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">אנא בחר פרופיל משתמש כדי לראות הודעות.</div>';
+    return;
+  }
+
+  // Filter notifications for active user
+  const userNotifs = state.notifications ? state.notifications.filter(n => {
+    return n.recipientId === state.currentUser.id || (state.currentUser.role === 'admin' && n.recipientId === 'admin');
+  }) : [];
+
+  if (userNotifs.length === 0) {
+    elList.innerHTML = `
+      <div style="text-align: center; color: var(--text-muted); padding: 40px 20px;">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 12px;">📭</span>
+        <div>אין הודעות חדשות בתיבה שלך.</div>
+      </div>
+    `;
+    return;
+  }
+
+  userNotifs.forEach(n => {
+    const item = document.createElement('div');
+    const isUnread = !n.readBy || !n.readBy.includes(state.currentUser.id);
+    item.className = `inbox-item ${n.type} ${isUnread ? 'unread' : ''}`;
+    
+    const timeStr = formatNotificationTime(n.timestamp);
+
+    item.innerHTML = `
+      <div class="inbox-item-header">
+        <span class="inbox-item-title">${n.title}</span>
+        <span class="inbox-item-time">${timeStr}</span>
+      </div>
+      <p class="inbox-item-text">${n.text}</p>
+    `;
+    elList.appendChild(item);
+  });
+}
+
+function formatNotificationTime(timestamp) {
+  const diffMs = Date.now() - timestamp;
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  if (diffMins < 1) return 'עכשיו';
+  if (diffMins < 60) return `לפני ${diffMins} דק'`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `לפני ${diffHours} שעות`;
+  
+  const d = new Date(timestamp);
+  return `${d.getDate()}/${d.getMonth() + 1} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+async function markNotificationsAsRead() {
+  if (!state.currentUser || !state.notifications) return;
+  
+  let hasChanges = false;
+  const updatedNotifications = state.notifications.map(n => {
+    const isRecipient = n.recipientId === state.currentUser.id || (state.currentUser.role === 'admin' && n.recipientId === 'admin');
+    if (isRecipient && (!n.readBy || !n.readBy.includes(state.currentUser.id))) {
+      const readByCopy = Array.isArray(n.readBy) ? [...n.readBy] : [];
+      readByCopy.push(state.currentUser.id);
+      n.readBy = readByCopy;
+      hasChanges = true;
+      
+      // Update Firestore in background if not local sandbox
+      if (state.groupId !== 'local-sandbox' && firebaseLoaded) {
+        db.collection('notifications').doc(n.id).update({
+          readBy: readByCopy
+        }).catch(err => console.error("Firebase update notification read status failed:", err));
+      }
+    }
+    return n;
+  });
+
+  if (hasChanges) {
+    state.notifications = updatedNotifications;
+    saveLocalFallbackState();
+    
+    // Hide badge immediately
+    const elInboxBadge = document.getElementById('inbox-badge');
+    if (elInboxBadge) {
+      elInboxBadge.style.display = 'none';
+    }
+  }
 }
 
 // Task board logic additions
@@ -4838,6 +5253,124 @@ async function migrateLocalDataToGroup(targetGroupId, isNewGroup, groupName) {
   } catch (err) {
     console.error("Migration to group failed:", err);
     showToast('שגיאה בסנכרון הנתונים לענן. אנא נסה שנית.', 'warning');
+  }
+}
+
+function initWelcomeOverlayEvents() {
+  const elWelcomeOverlay = document.getElementById('welcome-overlay');
+  const elCreateBtn = document.getElementById('welcome-create-family-btn');
+  const elJoinBtn = document.getElementById('welcome-join-family-btn');
+  
+  const elMainOptions = document.getElementById('welcome-main-options');
+  const elCodeForm = document.getElementById('welcome-code-form');
+  
+  const elCodeInput = document.getElementById('welcome-family-code-input');
+  const elCodeSubmit = document.getElementById('welcome-code-submit-btn');
+  const elCodeBack = document.getElementById('welcome-code-back-btn');
+  const elCodeError = document.getElementById('welcome-code-error');
+  
+  if (elCreateBtn) {
+    elCreateBtn.addEventListener('click', () => {
+      // 1. Confirm visit
+      localStorage.setItem('household_visited', 'true');
+      
+      // 2. Hide welcome overlay
+      if (elWelcomeOverlay) elWelcomeOverlay.classList.remove('active');
+      
+      // 3. Open Family Settings modal
+      const elFamilySettingsOverlay = document.getElementById('family-settings-overlay');
+      if (elFamilySettingsOverlay) {
+        elFamilySettingsOverlay.classList.add('active');
+        renderProfilesList();
+      }
+      
+      // 4. Focus and select nickname input field
+      const elFamilyNicknameInput = document.getElementById('admin-family-nickname-input');
+      if (elFamilyNicknameInput) {
+        setTimeout(() => {
+          elFamilyNicknameInput.focus();
+          elFamilyNicknameInput.select();
+        }, 300);
+      }
+    });
+  }
+  
+  if (elJoinBtn) {
+    elJoinBtn.addEventListener('click', () => {
+      if (elMainOptions) elMainOptions.style.display = 'none';
+      if (elCodeForm) elCodeForm.style.display = 'flex';
+      if (elCodeInput) {
+        elCodeInput.value = '';
+        elCodeInput.focus();
+      }
+      if (elCodeError) elCodeError.style.display = 'none';
+    });
+  }
+  
+  if (elCodeBack) {
+    elCodeBack.addEventListener('click', () => {
+      if (elMainOptions) elMainOptions.style.display = 'flex';
+      if (elCodeForm) elCodeForm.style.display = 'none';
+    });
+  }
+  
+  if (elCodeSubmit) {
+    elCodeSubmit.addEventListener('click', async () => {
+      if (!elCodeInput) return;
+      const code = elCodeInput.value.trim();
+      
+      if (!code) {
+        showError("נא להזין קוד משפחה.");
+        return;
+      }
+      
+      if (!db) {
+        showError("המערכת לא מחוברת לאינטרנט. לא ניתן להתחבר למשפחה קיימת במצב Offline.");
+        return;
+      }
+      
+      // Show loading spinner/status on button
+      const originalText = elCodeSubmit.innerHTML;
+      elCodeSubmit.disabled = true;
+      elCodeSubmit.innerHTML = 'מתחבר... ⏳';
+      if (elCodeError) elCodeError.style.display = 'none';
+      
+      try {
+        const doc = await db.collection('groups').doc(code).get();
+        if (doc.exists) {
+          // Success! Group exists. Save to localStorage
+          localStorage.setItem('household_group_id', code);
+          localStorage.setItem('household_visited', 'true');
+          
+          // Clear current user/profile to force profile selection
+          localStorage.removeItem('household_current_user');
+          localStorage.removeItem('household_user_profile');
+          
+          // Close welcome overlay
+          if (elWelcomeOverlay) elWelcomeOverlay.classList.remove('active');
+          
+          // Reload the page to bind Firestore listeners to the new group
+          window.location.reload();
+        } else {
+          showError("קוד המשפחה לא נמצא. אנא ודא שהקוד נכון.");
+        }
+      } catch (err) {
+        console.error("Error connecting to group:", err);
+        showError("שגיאה בהתחברות לקבוצה. אנא נסה שנית.");
+      } finally {
+        elCodeSubmit.disabled = false;
+        elCodeSubmit.innerHTML = originalText;
+      }
+    });
+  }
+  
+  function showError(msg) {
+    if (elCodeError) {
+      elCodeError.textContent = msg;
+      elCodeError.style.display = 'block';
+    } else {
+      alert(msg);
+    }
   }
 }
 

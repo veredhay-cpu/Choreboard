@@ -1593,14 +1593,14 @@ body.theme-light .btn-share-mail:hover {
 
 /* Paid Task Special Highlight Style */
 .task-card.paid-task {
-  background: var(--bg-card-paid);
-  border: 1.5px solid var(--border-card-paid);
+  background: var(--bg-card-paid) !important;
+  border: 1.5px solid var(--border-card-paid) !important;
   box-shadow: 0 4px 15px var(--shadow-card-paid), var(--shadow-lg);
 }
 
 .task-card.paid-task:hover {
-  background: var(--bg-card-paid-hover);
-  border-color: var(--border-card-paid-hover);
+  background: var(--bg-card-paid-hover) !important;
+  border-color: var(--border-card-paid-hover) !important;
   box-shadow: 0 6px 20px var(--shadow-card-paid-hover), var(--shadow-lg), var(--shadow-glow);
 }
 
@@ -2043,6 +2043,13 @@ body.color-white {
   --border-color-active: rgba(100, 116, 139, 0.35);
   --gradient-color-1: rgba(100, 116, 139, 0.08);
   --gradient-color-2: rgba(148, 163, 184, 0.05);
+  
+  --bg-card-paid: rgba(100, 116, 139, 0.06);
+  --bg-card-paid-hover: rgba(100, 116, 139, 0.1);
+  --border-card-paid: rgba(100, 116, 139, 0.22);
+  --border-card-paid-hover: rgba(100, 116, 139, 0.38);
+  --shadow-card-paid: rgba(100, 116, 139, 0.02);
+  --shadow-card-paid-hover: rgba(100, 116, 139, 0.05);
 }
 
 body.color-purple {
@@ -2053,6 +2060,13 @@ body.color-purple {
   --border-color-active: rgba(139, 92, 246, 0.4);
   --gradient-color-1: rgba(139, 92, 246, 0.18);
   --gradient-color-2: rgba(236, 72, 153, 0.12);
+  
+  --bg-card-paid: rgba(139, 92, 246, 0.06);
+  --bg-card-paid-hover: rgba(139, 92, 246, 0.1);
+  --border-card-paid: rgba(139, 92, 246, 0.22);
+  --border-card-paid-hover: rgba(139, 92, 246, 0.38);
+  --shadow-card-paid: rgba(139, 92, 246, 0.02);
+  --shadow-card-paid-hover: rgba(139, 92, 246, 0.05);
 }
 
 body.color-emerald {
@@ -2063,6 +2077,13 @@ body.color-emerald {
   --border-color-active: rgba(16, 185, 129, 0.4);
   --gradient-color-1: rgba(16, 185, 129, 0.18);
   --gradient-color-2: rgba(4, 120, 87, 0.12);
+  
+  --bg-card-paid: rgba(16, 185, 129, 0.06);
+  --bg-card-paid-hover: rgba(16, 185, 129, 0.1);
+  --border-card-paid: rgba(16, 185, 129, 0.22);
+  --border-card-paid-hover: rgba(16, 185, 129, 0.38);
+  --shadow-card-paid: rgba(16, 185, 129, 0.02);
+  --shadow-card-paid-hover: rgba(16, 185, 129, 0.05);
 }
 
 body.color-ocean {
@@ -2073,6 +2094,13 @@ body.color-ocean {
   --border-color-active: rgba(14, 165, 233, 0.4);
   --gradient-color-1: rgba(14, 165, 233, 0.18);
   --gradient-color-2: rgba(3, 105, 161, 0.12);
+  
+  --bg-card-paid: rgba(14, 165, 233, 0.06);
+  --bg-card-paid-hover: rgba(14, 165, 233, 0.1);
+  --border-card-paid: rgba(14, 165, 233, 0.22);
+  --border-card-paid-hover: rgba(14, 165, 233, 0.38);
+  --shadow-card-paid: rgba(14, 165, 233, 0.02);
+  --shadow-card-paid-hover: rgba(14, 165, 233, 0.05);
 }
 
 body.color-sunset {
@@ -2083,6 +2111,13 @@ body.color-sunset {
   --border-color-active: rgba(236, 72, 153, 0.4);
   --gradient-color-1: rgba(236, 72, 153, 0.18);
   --gradient-color-2: rgba(190, 24, 74, 0.12);
+  
+  --bg-card-paid: rgba(236, 72, 153, 0.06);
+  --bg-card-paid-hover: rgba(236, 72, 153, 0.1);
+  --border-card-paid: rgba(236, 72, 153, 0.22);
+  --border-card-paid-hover: rgba(236, 72, 153, 0.38);
+  --shadow-card-paid: rgba(236, 72, 153, 0.02);
+  --shadow-card-paid-hover: rgba(236, 72, 153, 0.05);
 }
 
 body.color-orange {
@@ -2093,6 +2128,13 @@ body.color-orange {
   --border-color-active: rgba(251, 146, 60, 0.4);
   --gradient-color-1: rgba(251, 146, 60, 0.18);
   --gradient-color-2: rgba(251, 191, 36, 0.15);
+  
+  --bg-card-paid: rgba(251, 146, 60, 0.06);
+  --bg-card-paid-hover: rgba(251, 146, 60, 0.1);
+  --border-card-paid: rgba(251, 146, 60, 0.22);
+  --border-card-paid-hover: rgba(251, 146, 60, 0.38);
+  --shadow-card-paid: rgba(251, 146, 60, 0.02);
+  --shadow-card-paid-hover: rgba(251, 146, 60, 0.05);
 }
 
 /* Light Mode Background Tint Overrides */
@@ -2131,44 +2173,86 @@ body.mode-light.color-white {
 body.mode-dark.color-purple {
   --bg-primary: #120a21;
   --bg-secondary: #1a0f30;
-  --bg-card: rgba(34, 18, 62, 0.65);
-  --bg-card-hover: rgba(34, 18, 62, 0.85);
+  --bg-card: rgba(139, 92, 246, 0.06);
+  --bg-card-hover: rgba(139, 92, 246, 0.12);
   --bg-glass: rgba(18, 10, 33, 0.4);
+  
+  --bg-card-paid: rgba(167, 139, 250, 0.15);
+  --bg-card-paid-hover: rgba(167, 139, 250, 0.22);
+  --border-card-paid: rgba(167, 139, 250, 0.35);
+  --border-card-paid-hover: rgba(167, 139, 250, 0.55);
+  --shadow-card-paid: rgba(167, 139, 250, 0.08);
+  --shadow-card-paid-hover: rgba(167, 139, 250, 0.15);
 }
 body.mode-dark.color-emerald {
   --bg-primary: #041f17;
   --bg-secondary: #062b20;
-  --bg-card: rgba(6, 43, 32, 0.65);
-  --bg-card-hover: rgba(6, 43, 32, 0.85);
+  --bg-card: rgba(16, 185, 129, 0.06);
+  --bg-card-hover: rgba(16, 185, 129, 0.12);
   --bg-glass: rgba(4, 31, 23, 0.4);
+  
+  --bg-card-paid: rgba(16, 185, 129, 0.15);
+  --bg-card-paid-hover: rgba(16, 185, 129, 0.22);
+  --border-card-paid: rgba(16, 185, 129, 0.35);
+  --border-card-paid-hover: rgba(16, 185, 129, 0.55);
+  --shadow-card-paid: rgba(16, 185, 129, 0.08);
+  --shadow-card-paid-hover: rgba(16, 185, 129, 0.15);
 }
 body.mode-dark.color-ocean {
   --bg-primary: #031c2c;
   --bg-secondary: #05263c;
-  --bg-card: rgba(5, 38, 60, 0.65);
-  --bg-card-hover: rgba(5, 38, 60, 0.85);
+  --bg-card: rgba(14, 165, 233, 0.06);
+  --bg-card-hover: rgba(14, 165, 233, 0.12);
   --bg-glass: rgba(3, 28, 44, 0.4);
+  
+  --bg-card-paid: rgba(14, 165, 233, 0.15);
+  --bg-card-paid-hover: rgba(14, 165, 233, 0.22);
+  --border-card-paid: rgba(14, 165, 233, 0.35);
+  --border-card-paid-hover: rgba(14, 165, 233, 0.55);
+  --shadow-card-paid: rgba(14, 165, 233, 0.08);
+  --shadow-card-paid-hover: rgba(14, 165, 233, 0.15);
 }
 body.mode-dark.color-sunset {
   --bg-primary: #1c030b;
   --bg-secondary: #280510;
-  --bg-card: rgba(40, 5, 16, 0.65);
-  --bg-card-hover: rgba(40, 5, 16, 0.85);
+  --bg-card: rgba(236, 72, 153, 0.06);
+  --bg-card-hover: rgba(236, 72, 153, 0.12);
   --bg-glass: rgba(28, 3, 11, 0.4);
+  
+  --bg-card-paid: rgba(236, 72, 153, 0.15);
+  --bg-card-paid-hover: rgba(236, 72, 153, 0.22);
+  --border-card-paid: rgba(236, 72, 153, 0.35);
+  --border-card-paid-hover: rgba(236, 72, 153, 0.55);
+  --shadow-card-paid: rgba(236, 72, 153, 0.08);
+  --shadow-card-paid-hover: rgba(236, 72, 153, 0.15);
 }
 body.mode-dark.color-orange {
   --bg-primary: #1f0b02;
   --bg-secondary: #2d1003;
-  --bg-card: rgba(45, 16, 3, 0.65);
-  --bg-card-hover: rgba(45, 16, 3, 0.85);
+  --bg-card: rgba(251, 146, 60, 0.06);
+  --bg-card-hover: rgba(251, 146, 60, 0.12);
   --bg-glass: rgba(31, 11, 2, 0.4);
+  
+  --bg-card-paid: rgba(251, 146, 60, 0.15);
+  --bg-card-paid-hover: rgba(251, 146, 60, 0.22);
+  --border-card-paid: rgba(251, 146, 60, 0.35);
+  --border-card-paid-hover: rgba(251, 146, 60, 0.55);
+  --shadow-card-paid: rgba(251, 146, 60, 0.08);
+  --shadow-card-paid-hover: rgba(251, 146, 60, 0.15);
 }
 body.mode-dark.color-white {
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
-  --bg-card: rgba(30, 41, 59, 0.65);
-  --bg-card-hover: rgba(30, 41, 59, 0.85);
+  --bg-card: rgba(148, 163, 184, 0.06);
+  --bg-card-hover: rgba(148, 163, 184, 0.12);
   --bg-glass: rgba(15, 23, 42, 0.4);
+  
+  --bg-card-paid: rgba(148, 163, 184, 0.15);
+  --bg-card-paid-hover: rgba(148, 163, 184, 0.22);
+  --border-card-paid: rgba(148, 163, 184, 0.35);
+  --border-card-paid-hover: rgba(148, 163, 184, 0.55);
+  --shadow-card-paid: rgba(148, 163, 184, 0.08);
+  --shadow-card-paid-hover: rgba(148, 163, 184, 0.15);
 }
 
 /* Color Dot styling */
@@ -2758,4 +2842,104 @@ body.mode-kids.color-white {
 
 .mascot-character {
   animation: mascotBounce 2.5s infinite ease-in-out;
+}
+
+/* Inbox Notification System */
+.inbox-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: var(--border-radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  transition: var(--transition-smooth);
+  direction: rtl;
+  text-align: right;
+  position: relative;
+}
+
+.inbox-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.inbox-item.unread {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--border-color-active);
+}
+
+.inbox-item.unread::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 8px;
+  height: 8px;
+  background-color: #ef4444;
+  border-radius: 50%;
+}
+
+.inbox-item.achievement {
+  border-right: 4px solid #10b981 !important;
+  background: rgba(16, 185, 129, 0.04) !important;
+}
+body.mode-light .inbox-item.achievement {
+  background: rgba(16, 185, 129, 0.06) !important;
+}
+
+.inbox-item.upcoming-deadline {
+  border-right: 4px solid #f97316 !important;
+  background: rgba(249, 115, 22, 0.04) !important;
+}
+body.mode-light .inbox-item.upcoming-deadline {
+  background: rgba(249, 115, 22, 0.06) !important;
+}
+
+.inbox-item.missed-deadline {
+  border-right: 4px solid #ef4444 !important;
+  background: rgba(239, 68, 68, 0.04) !important;
+}
+body.mode-light .inbox-item.missed-deadline {
+  background: rgba(239, 68, 68, 0.06) !important;
+}
+
+.inbox-item.kid-achievement {
+  border-right: 4px solid #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.04) !important;
+}
+body.mode-light .inbox-item.kid-achievement {
+  background: rgba(59, 130, 246, 0.06) !important;
+}
+
+.inbox-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.inbox-item-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.inbox-item-time {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.inbox-item-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Light / Kids theme text improvements inside inbox modal */
+body.mode-light .user-picker-modal h3,
+body.mode-kids .user-picker-modal h3 {
+  color: var(--text-primary) !important;
 }
