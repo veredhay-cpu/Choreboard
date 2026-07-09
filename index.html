@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
   <script>
     // Modern Inline Cache Buster
     (function() {
-      const CURRENT_VERSION = '1.6.6'; // Hardcoded in the HTML file
+      const CURRENT_VERSION = '1.13.3'; // Hardcoded in the HTML file
       const urlParams = new URLSearchParams(window.location.search);
       const urlVersion = urlParams.get('v');
       
@@ -44,7 +44,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=1.6.6">
+  <link rel="stylesheet" href="styles.css?v=1.13.3">
 </head>
 <body class="color-purple mode-light">
 
@@ -57,7 +57,12 @@
           ⭐ StarTask
           <span id="header-group-badge" class="group-badge" style="display: none; font-size: 0.85rem; padding: 4px 10px; border-radius: 50px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.2); font-weight: bold;"></span>
         </h1>
-        <p>מערכת המשימות והתגמולים של המשפחה</p>
+        <div class="family-selector-container" style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+          <span style="font-size: 0.95rem; color: var(--text-secondary);">קבוצה משפחתית:</span>
+          <span id="header-family-name" style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">טוען...</span>
+          <select id="header-family-select" style="display: none; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-primary); padding: 4px 28px 4px 12px; font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: var(--transition-smooth); outline: none; appearance: none; -webkit-appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23a78bfa%22 stroke-width=%223%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%226 9 12 15 18 9%22></polyline></svg>'); background-repeat: no-repeat; background-position: left 10px center; direction: rtl;"></select>
+        </div>
+        <p style="display: none;">מערכת המשימות והתגמולים של המשפחה</p>
       </div>
       
       <div class="profile-bar">
@@ -99,13 +104,13 @@
         <div class="home-menu-grid">
           
           <!-- Card 1: Add Task -->
-          <div class="menu-card menu-card-add-task" id="menu-card-add-task">
-            <div class="menu-card-icon">➕</div>
+          <div class="menu-card menu-card-add-task" id="menu-card-add-task" style="border: 1px solid var(--border-color); cursor: pointer;">
+            <div class="menu-card-icon">⚡</div>
             <div style="flex-grow: 1; text-align: right; direction: rtl;">
-              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">משימה חדשה</h3>
+              <h3 style="margin: 0 0 4px 0; font-size: 1.15rem; font-weight: 800; color: var(--accent-purple);">פתיחת משימה</h3>
               <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary);">הוספת מטלה או משימה חדשה ללוח המשפחה</p>
             </div>
-            <div style="font-size: 1.1rem; color: var(--text-muted);">👈</div>
+            <div style="font-size: 1.1rem; color: var(--accent-purple);">👈</div>
           </div>
           
           <!-- Card 2: Tasks Chores -->
@@ -260,7 +265,7 @@
         </button>
         <div class="task-filters">
           <button class="filter-btn active" data-filter="my">🙋 המשימות שלי</button>
-          <button class="filter-btn" data-filter="all">📂 המשימות של כולם</button>
+          <button class="filter-btn" data-filter="all">📂 כל המשימות</button>
           <button class="filter-btn" data-filter="completed">✔️ משימות שהושלמו</button>
           <button class="filter-btn" data-filter="paid">💰 משימות בתשלום</button>
           <button class="filter-btn" data-filter="calendar">📅 לוח שנה</button>
@@ -415,6 +420,11 @@
         </div>
       </div>
       
+      <!-- Go to Welcome Screen Button -->
+      <button type="button" class="btn btn-secondary" id="family-settings-welcome-btn" style="width: 100%; margin-top: 12px; border: 1.5px dashed var(--border-color); background: rgba(139, 92, 246, 0.05); color: var(--accent-purple); font-weight: bold; padding: 12px; font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: var(--border-radius-md); transition: var(--transition-smooth);">
+        👋 מעבר למסך ברוכים הבאים (הקמה / חיבור משפחה)
+      </button>
+
       <!-- Finish Button at the bottom of the modal -->
       <button type="button" class="btn btn-primary" id="family-settings-finish-btn" style="width: 100%; margin-top: 12px; background: linear-gradient(135deg, var(--accent-purple) 0%, #7c3aed 100%); border: none; font-weight: bold; padding: 12px; font-size: 1rem; cursor: pointer; box-shadow: var(--shadow-glow);">
         ✔️ סיום ושמירה
@@ -478,56 +488,75 @@
 
   <!-- Edit Task Modal Overlay -->
   <div class="user-picker-overlay" id="edit-task-overlay">
-    <div class="user-picker-modal glass-panel" style="max-width: 480px; text-align: right;">
+    <div class="user-picker-modal glass-panel" style="max-width: 480px; text-align: right; background: var(--bg-secondary); border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
         <h3 style="margin: 0; font-size: 1.25rem;">✏️ עריכת משימה משפחתית</h3>
-        <button class="close-btn" id="edit-task-close-btn" style="line-height: 1;">&times;</button>
+        <button class="close-btn" id="edit-task-close-btn" style="line-height: 1; background: none; border: none; font-size: 2rem; color: var(--text-muted); cursor: pointer;">&times;</button>
       </div>
       
       <form id="admin-edit-task-form">
         <input type="hidden" id="admin-edit-task-id">
 
-        <div class="form-group">
-          <label for="admin-edit-task-title">שם המשימה / המטלה</label>
-          <input type="text" id="admin-edit-task-title" class="form-control" required>
+        <!-- 1. Task Title & Status -->
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="admin-edit-task-title" style="font-weight: 600;">שם משימה</label>
+          <input type="text" id="admin-edit-task-title" class="form-control" placeholder="לדוגמה: שטיפת כלים, ניקוי חדר..." required>
         </div>
 
-        <div class="form-group">
-          <label for="admin-edit-task-desc">תיאור או הנחיות נוספות</label>
-          <textarea id="admin-edit-task-desc" class="form-control" rows="2" maxlength="200"></textarea>
-          <small style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">* הגבלת אורך של עד 200 תווים</small>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="admin-edit-task-status" style="font-weight: 600;">סטטוס משימה</label>
+          <select id="admin-edit-task-status" class="form-control">
+            <option value="new">🆕 חדש</option>
+            <option value="in-progress">⏳ בטיפול</option>
+            <option value="completed">✅ הסתיים</option>
+          </select>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="admin-edit-task-assignee">אחריות ושיוך</label>
-            <select id="admin-edit-task-assignee" class="form-control" required>
-              <!-- Populated dynamically -->
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="admin-edit-task-status">סטטוס משימה</label>
-            <select id="admin-edit-task-status" class="form-control">
-              <option value="new">🆕 חדש</option>
-              <option value="in-progress">⏳ בטיפול</option>
-              <option value="completed">✅ הסתיים</option>
-            </select>
+        <!-- 2. Task Assignee -->
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">מי אחראי על המשימה?</label>
+          <select id="admin-edit-task-assignee" style="display: none;"></select>
+          <div style="position: relative; width: 100%;">
+            <div id="admin-edit-task-assignee-custom-selector" style="display: flex; gap: 16px; overflow-x: auto; padding: 10px 4px; direction: rtl; -webkit-overflow-scrolling: touch; scrollbar-width: none;"></div>
+            <div id="edit-assignee-scroll-indicator" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background: rgba(139, 92, 246, 0.9); display: none; align-items: center; justify-content: center; color: white; font-size: 0.9rem; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 5; animation: pulseArrow 1.5s infinite;">←</div>
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="admin-edit-task-payment-type">סוג תגמול</label>
+        <!-- 3. Task Due Date -->
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">מתי לבצע?</label>
+          <div class="due-date-options" style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button type="button" class="btn btn-secondary edit-due-option-btn" data-option="custom" style="flex: 1; padding: 10px; font-size: 0.9rem; font-weight: 600; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: var(--border-radius-md); transition: var(--transition-smooth);">מותאם אישית</button>
+            <button type="button" class="btn btn-secondary edit-due-option-btn" data-option="tomorrow" style="flex: 1; padding: 10px; font-size: 0.9rem; font-weight: 600; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: var(--border-radius-md); transition: var(--transition-smooth);">מחר</button>
+            <button type="button" class="btn btn-secondary edit-due-option-btn" data-option="next-week" style="flex: 1; padding: 10px; font-size: 0.9rem; font-weight: 600; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: var(--border-radius-md); transition: var(--transition-smooth);">שבוע הבא</button>
+          </div>
+          <div id="edit-custom-date-input-container" style="display: none; transition: all 0.2s ease;">
+            <input type="date" id="admin-edit-task-due-date" class="form-control" onclick="if (typeof this.showPicker === 'function') { try { this.showPicker(); } catch(e) {} }">
+          </div>
+          <div id="edit-due-date-summary" style="font-size: 0.85rem; color: #a78bfa; margin-top: 8px; font-weight: 600; display: block; text-align: right;"></div>
+        </div>
+
+        <!-- 4. Expandable Settings Toggle -->
+        <div style="text-align: center; margin-bottom: 20px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+          <button type="button" id="edit-task-expand-btn" class="btn btn-secondary" style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2); color: var(--accent-purple); width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; padding: 10px;">
+            <span>⚙️ הגדרות נוספות (תגמול, הערות, מחזוריות, תזכורת...)</span>
+            <span id="edit-expand-arrow" style="transition: transform 0.2s ease;">▼</span>
+          </button>
+        </div>
+
+        <!-- 5. Expanded Content -->
+        <div id="edit-task-expanded-content" style="display: none; transition: all 0.3s ease;">
+          <!-- 5.1 Reward Type -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="admin-edit-task-payment-type" style="font-weight: 600;">סוג תגמול</label>
             <select id="admin-edit-task-payment-type" class="form-control">
-              <option value="volunteer">משימה שוטפת (ללא תשלום)</option>
-              <option value="paid">משימה בתשלום</option>
+              <option value="volunteer">⭐ כוכבים (תגמול דיפולטיבי)</option>
+              <option value="paid">₪ כסף (משימה בתשלום)</option>
             </select>
           </div>
-          <div class="form-group" id="edit-reward-amount-group" style="display: none;">
-            <label for="admin-edit-task-reward">גובה התשלום (₪)</label>
-            <input type="number" id="admin-edit-task-reward" class="form-control" min="0" value="0">
-          </div>
-          <div class="form-group" id="edit-reward-stars-group" style="display: block;">
+
+          <!-- Stars Rating Selector (default) -->
+          <div class="form-group" id="edit-reward-stars-group" style="display: block; margin-bottom: 16px;">
             <label style="display: block; margin-bottom: 8px;">כמות כוכבים לתגמול (⭐)</label>
             <div class="star-rating-selector" id="edit-star-rating" style="display: flex; gap: 8px; font-size: 1.8rem; cursor: pointer; direction: rtl; width: fit-content; user-select: none;">
               <span data-value="1">⭐</span>
@@ -538,193 +567,221 @@
             </div>
             <input type="hidden" id="admin-edit-task-reward-stars" value="1">
           </div>
-        </div>
 
-        <div class="form-group">
-          <label for="admin-edit-task-due-date">תאריך יעד (לא חובה)</label>
-          <input type="date" id="admin-edit-task-due-date" class="form-control" onclick="if (typeof this.showPicker === 'function') { try { this.showPicker(); } catch(e) {} }">
-        </div>
+          <!-- Money Amount Input (hidden by default) -->
+          <div class="form-group" id="edit-reward-amount-group" style="display: none; margin-bottom: 16px;">
+            <label for="admin-edit-task-reward" style="font-weight: 600;">גובה התשלום (₪)</label>
+            <input type="number" id="admin-edit-task-reward" class="form-control" placeholder="0" min="0" value="0">
+          </div>
 
-        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
+          <!-- 5.2 Notes / Remarks -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="admin-edit-task-desc" style="font-weight: 600;">הערות</label>
+            <textarea id="admin-edit-task-desc" class="form-control" rows="2" placeholder="הערות או הנחיות נוספות לגבי ביצוע המשימה..."></textarea>
+          </div>
+
+          <!-- 5.3 Recurring Task Checkbox -->
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
             <input type="checkbox" id="admin-edit-task-is-recurring" style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor: pointer;">
             <label for="admin-edit-task-is-recurring" style="font-weight: 600; cursor: pointer; user-select: none;">🔄 משימה מחזורית שבועית</label>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 8px;">
+          <!-- Recurring Chores Group -->
+          <div id="edit-recurring-config-group" style="display: none; background: rgba(255, 255, 255, 0.02); border-right: 3px solid var(--accent-purple); padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 16px;">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="admin-edit-task-weekly-day">יום בשבוע לביצוע</label>
+                <select id="admin-edit-task-weekly-day" class="form-control">
+                  <option value="0">יום ראשון</option>
+                  <option value="1">יום שני</option>
+                  <option value="2">יום שלישי</option>
+                  <option value="3">יום רביעי</option>
+                  <option value="4">יום חמישי</option>
+                  <option value="5">יום שישי</option>
+                  <option value="6">יום שבת</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label style="display: block; margin-bottom: 6px;">שעת ביצוע (24ש')</label>
+                <div style="display: flex; gap: 8px; align-items: center; direction: ltr;">
+                  <select id="admin-edit-task-recurring-hour" class="form-control" style="padding: 12px 8px; text-align: center; width: 70px;"></select>
+                  <span style="font-weight: bold; color: var(--text-secondary);">:</span>
+                  <select id="admin-edit-task-recurring-minute" class="form-control" style="padding: 12px 8px; text-align: center; width: 70px;"></select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5.3.1 Shared Task Checkbox -->
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+            <input type="checkbox" id="admin-edit-task-is-shared" style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor: pointer;">
+            <label for="admin-edit-task-is-shared" style="font-weight: 600; cursor: pointer; user-select: none;">👥 משימה משותפת (תור סבב ביצוע)</label>
+          </div>
+
+          <!-- Drag and drop queue config -->
+          <div id="edit-multi-assignee-group" style="display: none; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 16px;">
+            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">סדרי את סדר תור המשתמשים (גררי לשינוי סדר):</label>
+            <div id="edit-multi-assignee-list" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Draggable list of users -->
+            </div>
+          </div>
+
+          <!-- 5.4 Reminder Checkbox -->
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
             <input type="checkbox" id="admin-edit-task-has-reminder" style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor: pointer;">
             <label for="admin-edit-task-has-reminder" style="font-weight: 600; cursor: pointer; user-select: none;">🔔 הגדרת תזכורת (פוש)</label>
           </div>
-        </div>
 
-        <!-- Recurring Chores Group -->
-        <div id="edit-recurring-config-group" style="display: none; background: rgba(255, 255, 255, 0.02); border-right: 3px solid var(--accent-purple); padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 16px;">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="admin-edit-task-weekly-day">יום בשבוע לביצוע</label>
-              <select id="admin-edit-task-weekly-day" class="form-control">
-                <option value="0">יום ראשון</option>
-                <option value="1">יום שני</option>
-                <option value="2">יום שלישי</option>
-                <option value="3">יום רביעי</option>
-                <option value="4">יום חמישי</option>
-                <option value="5">יום שישי</option>
-                <option value="6">יום שבת</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>שעת ביצוע (24ש')</label>
-              <div style="display: flex; gap: 8px; align-items: center; direction: ltr;">
-                <select id="admin-edit-task-recurring-hour" class="form-control" style="padding: 12px 8px; text-align: center; width: 70px;"></select>
-                <span style="font-weight: bold; color: var(--text-secondary);">:</span>
-                <select id="admin-edit-task-recurring-minute" class="form-control" style="padding: 12px 8px; text-align: center; width: 70px;"></select>
+          <!-- Reminder Group -->
+          <div id="edit-reminder-config-group" style="display: none; background: rgba(255, 255, 255, 0.02); border-right: 3px solid var(--accent-emerald); padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 16px;">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="admin-edit-task-reminder-date">תאריך התזכורת</label>
+                <input type="date" id="admin-edit-task-reminder-date" class="form-control" onclick="if (typeof this.showPicker === 'function') { try { this.showPicker(); } catch(e) {} }">
+              </div>
+              <div class="form-group">
+                <label style="display: block; margin-bottom: 6px;">שעת התזכורת (24ש')</label>
+                <div style="display: flex; gap: 8px; align-items: center; direction: ltr;">
+                  <select id="admin-edit-task-reminder-hour" class="form-control" style="padding: 12px 8px; text-align: center; width: 70px;"></select>
+                  <span style="font-weight: bold; color: var(--text-secondary);">:</span>
+                  <select id="admin-edit-task-reminder-minute" class="form-control" style="padding: 12px 8px; text-align: center; width: 70px;"></select>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Reminder Group -->
-        <div id="edit-reminder-config-group" style="display: none; background: rgba(255, 255, 255, 0.02); border-right: 3px solid var(--accent-emerald); padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 16px;">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="admin-edit-task-reminder-date">תאריך התזכורת</label>
-              <input type="date" id="admin-edit-task-reminder-date" class="form-control" onclick="if (typeof this.showPicker === 'function') { try { this.showPicker(); } catch(e) {} }">
-            </div>
-            <div class="form-group">
-              <label>שעת התזכורת (24ש')</label>
-              <div style="display: flex; gap: 8px; align-items: center; direction: ltr;">
-                <select id="admin-edit-task-reminder-hour" class="form-control" style="padding: 12px 8px; text-align: center; width: 70px;"></select>
-                <span style="font-weight: bold; color: var(--text-secondary);">:</span>
-                <select id="admin-edit-task-reminder-minute" class="form-control" style="padding: 12px 8px; text-align: center; width: 70px;"></select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer-row">
-          <button type="submit" class="btn btn-primary" style="flex: 2;">💾 שמור שינויים</button>
-          <button type="button" class="btn btn-primary" id="admin-edit-task-delete-btn" style="flex: 1; background: var(--accent-pink);">🗑️ מחק משימה</button>
+        <div class="modal-footer-row" style="margin-top: 20px;">
+          <button type="submit" class="btn btn-primary" style="flex: 2; padding: 12px; font-weight: bold;">💾 שמור שינויים</button>
+          <button type="button" class="btn btn-primary" id="admin-edit-task-delete-btn" style="flex: 1; background: var(--accent-pink); padding: 12px; font-weight: bold;">🗑️ מחק משימה</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Create Task Modal Overlay -->
-  <div class="user-picker-overlay" id="create-task-overlay">
-    <div class="user-picker-modal glass-panel" style="max-width: 480px; text-align: right;">
+  <!-- Create Task Modal Overlay (Unified) -->
+  <div class="user-picker-overlay" id="create-task-overlay" style="background: rgba(15, 23, 42, 0.95); justify-content: center; align-items: flex-start; overflow-y: auto; z-index: 1010; padding: 20px 12px; -webkit-overflow-scrolling: touch;">
+    <div class="user-picker-modal glass-panel" style="max-width: 480px; text-align: right; background: var(--bg-secondary); border: 1px solid var(--border-color); box-shadow: var(--shadow-lg);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-        <h3 style="margin: 0; font-size: 1.25rem;">➕ יצירת משימה משפחתית חדשה</h3>
-        <button class="close-btn" id="create-task-close-btn" style="line-height: 1;">&times;</button>
+        <h3 style="margin: 0; font-size: 1.25rem;">➕ פתיחת משימה</h3>
+        <button class="close-btn" id="fast-create-task-close-btn" style="line-height: 1; background: none; border: none; font-size: 2rem; color: var(--text-muted); cursor: pointer;">&times;</button>
       </div>
       
-      <form id="admin-form">
-        
-        <div class="form-group">
-          <label for="admin-task-title">שם המשימה / המטלה</label>
-          <input type="text" id="admin-task-title" class="form-control" placeholder="לדוגמה: לזרוק את הזבל" required>
-        </div>
-        
-        <div class="form-group">
-          <label for="admin-task-desc">תיאור או הנחיות נוספות</label>
-          <textarea id="admin-task-desc" class="form-control" placeholder="פרטים נוספים..." rows="2" maxlength="200"></textarea>
-          <small style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">* הגבלת אורך של עד 200 תווים</small>
+      <form id="fast-admin-form" onsubmit="event.preventDefault();">
+        <!-- 1. Task Title -->
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="fast-task-title" style="font-weight: 600;">שם משימה</label>
+          <input type="text" id="fast-task-title" class="form-control" placeholder="לדוגמה: שטיפת כלים, ניקוי חדר..." required>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="admin-assignee">אחריות ושיוך</label>
-            <select id="admin-assignee" class="form-control" required>
-              <!-- Populated in JS -->
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="admin-payment-type">סוג תגמול</label>
-            <select id="admin-payment-type" class="form-control">
-              <option value="volunteer">משימה שוטפת (ללא תשלום)</option>
-              <option value="paid">משימה בתשלום</option>
-            </select>
+        <!-- 2. Task Assignee -->
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">מי אחראי על המשימה?</label>
+          <select id="fast-task-assignee" style="display: none;"></select>
+          <div style="position: relative; width: 100%;">
+            <div id="fast-task-assignee-custom-selector" style="display: flex; gap: 16px; overflow-x: auto; padding: 10px 4px; direction: rtl; -webkit-overflow-scrolling: touch; scrollbar-width: none;"></div>
+            <div id="fast-assignee-scroll-indicator" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background: rgba(139, 92, 246, 0.9); display: none; align-items: center; justify-content: center; color: white; font-size: 0.9rem; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 5; animation: pulseArrow 1.5s infinite;">←</div>
           </div>
         </div>
 
-        <div class="form-row">
-          <!-- Conditionally shown if paid is selected -->
-          <div class="form-group" id="reward-amount-group" style="display: none; grid-column: span 2;">
-            <label for="admin-reward">גובה התשלום (₪)</label>
-            <input type="number" id="admin-reward" class="form-control" placeholder="0" min="0" value="0">
+        <!-- 3. Task Due Date -->
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">מתי לבצע?</label>
+          <div class="due-date-options" style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button type="button" class="btn btn-secondary fast-due-option-btn" data-option="custom" style="flex: 1; padding: 10px; font-size: 0.9rem; font-weight: 600; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: var(--border-radius-md); transition: var(--transition-smooth);">מותאם אישית</button>
+            <button type="button" class="btn btn-secondary fast-due-option-btn" data-option="tomorrow" style="flex: 1; padding: 10px; font-size: 0.9rem; font-weight: 600; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: var(--border-radius-md); transition: var(--transition-smooth);">מחר</button>
+            <button type="button" class="btn btn-secondary fast-due-option-btn" data-option="next-week" style="flex: 1; padding: 10px; font-size: 0.9rem; font-weight: 600; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: var(--border-radius-md); transition: var(--transition-smooth);">שבוע הבא</button>
           </div>
-          <!-- Conditionally shown if volunteer is selected -->
-          <div class="form-group" id="reward-stars-group" style="display: block; grid-column: span 2;">
+          <div id="fast-custom-date-input-container" style="display: none; transition: all 0.2s ease;">
+            <input type="date" id="fast-task-due-date" class="form-control" onclick="if (typeof this.showPicker === 'function') { try { this.showPicker(); } catch(e) {} }">
+          </div>
+          <div id="fast-due-date-summary" style="font-size: 0.85rem; color: #a78bfa; margin-top: 8px; font-weight: 600; display: block; text-align: right;"></div>
+        </div>
+
+        <!-- 4. Expandable Settings Toggle -->
+        <div style="text-align: center; margin-bottom: 20px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+          <button type="button" id="fast-task-expand-btn" class="btn btn-secondary" style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2); color: var(--accent-purple); width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; padding: 10px;">
+            <span>⚙️ הגדרות נוספות (תגמול, מחזוריות, משימה משותפת...)</span>
+            <span id="fast-expand-arrow" style="transition: transform 0.2s ease;">▼</span>
+          </button>
+        </div>
+
+        <!-- 5. Expanded Content -->
+        <div id="fast-task-expanded-content" style="display: none; transition: all 0.3s ease;">
+          <!-- 5.1 Reward Type -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="fast-task-payment-type" style="font-weight: 600;">סוג תגמול</label>
+            <select id="fast-task-payment-type" class="form-control">
+              <option value="volunteer">⭐ כוכבים (תגמול דיפולטיבי)</option>
+              <option value="paid">₪ כסף (משימה בתשלום)</option>
+            </select>
+          </div>
+
+          <!-- Stars Rating Selector (default) -->
+          <div class="form-group" id="fast-reward-stars-group" style="display: block; margin-bottom: 16px;">
             <label style="display: block; margin-bottom: 8px;">כמות כוכבים לתגמול (⭐)</label>
-            <div class="star-rating-selector" id="create-star-rating" style="display: flex; gap: 8px; font-size: 1.8rem; cursor: pointer; direction: rtl; width: fit-content; user-select: none;">
+            <div class="star-rating-selector" id="fast-star-rating" style="display: flex; gap: 8px; font-size: 1.8rem; cursor: pointer; direction: rtl; width: fit-content; user-select: none;">
               <span data-value="1">⭐</span>
               <span data-value="2">☆</span>
               <span data-value="3">☆</span>
               <span data-value="4">☆</span>
               <span data-value="5">☆</span>
             </div>
-            <input type="hidden" id="admin-reward-stars" value="1">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="admin-task-due-date">תאריך יעד (לא חובה)</label>
-          <input type="date" id="admin-task-due-date" class="form-control" onclick="if (typeof this.showPicker === 'function') { try { this.showPicker(); } catch(e) {} }">
-        </div>
-
-        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="admin-is-recurring" style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor: pointer;">
-            <label for="admin-is-recurring" style="font-weight: 600; cursor: pointer; user-select: none;">🔄 משימה מחזורית שבועית</label>
+            <input type="hidden" id="fast-reward-stars" value="1">
           </div>
 
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="admin-has-reminder" style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor: pointer;">
-            <label for="admin-has-reminder" style="font-weight: 600; cursor: pointer; user-select: none;">🔔 הגדרת תזכורת (פוש)</label>
+          <!-- Money Amount Input (hidden by default) -->
+          <div class="form-group" id="fast-reward-amount-group" style="display: none; margin-bottom: 16px;">
+            <label for="fast-reward" style="font-weight: 600;">גובה התשלום (₪)</label>
+            <input type="number" id="fast-reward" class="form-control" placeholder="0" min="0" value="0">
           </div>
-        </div>
 
-        <!-- Recurring Chores Group -->
-        <div id="recurring-config-group" style="display: none; background: rgba(255, 255, 255, 0.02); border-right: 3px solid var(--accent-purple); padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 16px;">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="admin-weekly-day">יום בשבוע לביצוע</label>
-              <select id="admin-weekly-day" class="form-control">
-                <option value="0">יום ראשון</option>
-                <option value="1">יום שני</option>
-                <option value="2">יום שלישי</option>
-                <option value="3">יום רביעי</option>
-                <option value="4">יום חמישי</option>
-                <option value="5">יום שישי</option>
-                <option value="6">יום שבת</option>
-              </select>
-            </div>
-            
-            <div class="form-group">
-              <label>׳©׳¢׳× ׳‘׳™׳¦׳•׳¢ ׳׳©׳•׳¢׳¨׳×</label>
-              <div style="display: flex; gap: 8px;">
-                <select id="admin-recurring-hour" class="form-control" style="flex: 1; text-align: center;"></select>
-                <span style="align-self: center; font-weight: bold;">:</span>
-                <select id="admin-recurring-minute" class="form-control" style="flex: 1; text-align: center;"></select>
+          <!-- 5.2 Notes / Remarks -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="fast-task-desc" style="font-weight: 600;">הערות</label>
+            <textarea id="fast-task-desc" class="form-control" rows="2" placeholder="הערות או הנחיות נוספות לגבי ביצוע המשימה..."></textarea>
+          </div>
+
+          <!-- 5.3 Recurring Task Checkbox -->
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+            <input type="checkbox" id="fast-is-recurring" style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor: pointer;">
+            <label for="fast-is-recurring" style="font-weight: 600; cursor: pointer; user-select: none;">🔄 משימה מחזורית</label>
+          </div>
+
+          <!-- Recurring Frequency config -->
+          <div id="fast-recurring-config-group" style="display: none; background: rgba(255, 255, 255, 0.02); border-right: 3px solid var(--accent-purple); padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 16px;">
+            <div class="form-group" style="margin: 0;">
+              <label style="display: block; font-weight: 600; margin-bottom: 6px;">תדירות חזרה</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="font-size: 0.9rem; color: var(--text-secondary);">חזרה:</span>
+                <input type="number" id="fast-recurring-frequency-times" class="form-control" style="width: 70px; text-align: center;" min="1" value="1">
+                <span style="font-size: 0.9rem; color: var(--text-secondary);">פעמים ב</span>
+                <select id="fast-recurring-frequency-period" class="form-control" style="flex: 1;">
+                  <option value="day">יום</option>
+                  <option value="week">שבוע</option>
+                  <option value="month">חודש</option>
+                </select>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Reminder Config Group -->
-        <div id="reminder-config-group" style="display: none; background: rgba(255, 255, 255, 0.02); border-right: 3px solid var(--accent-rose); padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 16px;">
-          <div class="form-row">
-            <div class="form-group">
-              <label>׳©׳¢׳× ׳×׳–׳›׳•׳¨׳×</label>
-              <div style="display: flex; gap: 8px;">
-                <select id="admin-reminder-hour" class="form-control" style="flex: 1; text-align: center;"></select>
-                <span style="align-self: center; font-weight: bold;">:</span>
-                <select id="admin-reminder-minute" class="form-control" style="flex: 1; text-align: center;"></select>
-              </div>
+          <!-- 5.4 Shared Task Checkbox -->
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+            <input type="checkbox" id="fast-is-shared" style="width: 18px; height: 18px; accent-color: var(--accent-purple); cursor: pointer;">
+            <label for="fast-is-shared" style="font-weight: 600; cursor: pointer; user-select: none;">👥 משימה משותפת (תור סבב ביצוע)</label>
+          </div>
+
+          <!-- Drag and drop queue config -->
+          <div id="fast-multi-assignee-group" style="display: none; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 12px; border-radius: var(--border-radius-sm); margin-bottom: 16px;">
+            <label style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">סדרי את סדר תור המשתמשים (גררי לשינוי סדר):</label>
+            <div id="fast-multi-assignee-list" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Draggable list of users -->
             </div>
           </div>
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">ג• ׳”׳•׳¡׳£ ׳׳©׳™׳׳”</button>
+        <!-- 6. Submit Button -->
+        <button type="submit" id="fast-submit-btn" class="btn btn-primary" style="width: 100%; margin-top: 10px; padding: 12px; font-size: 1.05rem; font-weight: bold;">⚡ הוסף משימה</button>
       </form>
     </div>
   </div>
@@ -790,6 +847,10 @@
         
         <button class="btn btn-secondary" id="welcome-join-family-btn" style="width: 100%; font-size: 1rem; font-weight: 700; padding: 14px; border-radius: var(--border-radius-md); border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.03); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: var(--transition-smooth);">
           <span>🔑</span> <span>התחברות למשפחה קיימת</span>
+        </button>
+        
+        <button class="btn btn-secondary" id="welcome-cancel-btn" style="display: none; width: 100%; font-size: 0.95rem; font-weight: 700; padding: 12px; border-radius: var(--border-radius-md); border: 1px dashed var(--border-color); background: rgba(255, 255, 255, 0.01); color: var(--text-secondary); cursor: pointer; margin-top: 8px; align-items: center; justify-content: center; gap: 6px;">
+          ❌ ביטול וחזרה למשפחה
         </button>
       </div>
 
@@ -1036,7 +1097,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="mockData.js"></script>
-  <script src="app.js?v=1.6.6"></script>
+  <script src="app.js?v=1.13.3"></script>
 
 </body>
 </html>

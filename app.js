@@ -1,4 +1,5 @@
-console.log("[OnboardingDebug] app.js script loaded successfully! Version: 1.6.6");
+// App logic for the Household Task Manager
+// Using direct DOM manipulation and simple State Management
 
 // Global Error Handler for mobile debugging
 window.onerror = function(message, source, lineno, colno, error) {
@@ -223,6 +224,7 @@ let state = {
 
 // Global variables for Calendar navigation
 let currentCalendarDate = new Date();
+let selectedSharedQueue = [];
 const HebrewMonths = [
   'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
   'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
@@ -427,7 +429,67 @@ function setupFirebaseListeners() {
   });
 }
 
+function getConnectedGroups() {
+  try {
+    const data = localStorage.getItem('household_connected_groups');
+    return data ? JSON.parse(data) : [];
+  } catch (e) {
+    console.error("Failed to parse connected groups:", e);
+    return [];
+  }
+}
+
+function addConnectedGroup(groupId, groupName) {
+  if (!groupId || groupId === 'local-sandbox') return;
+  const groups = getConnectedGroups();
+  const existing = groups.find(g => g.id === groupId);
+  if (existing) {
+    if (existing.name !== groupName && groupName) {
+      existing.name = groupName;
+      localStorage.setItem('household_connected_groups', JSON.stringify(groups));
+    }
+  } else {
+    groups.push({ id: groupId, name: groupName || groupId });
+    localStorage.setItem('household_connected_groups', JSON.stringify(groups));
+  }
+}
+
 function updateGroupNameUI() {
+  if (state.groupId && state.groupId !== 'local-sandbox' && state.groupName) {
+    addConnectedGroup(state.groupId, state.groupName);
+  }
+  
+  const groups = getConnectedGroups();
+  const elFamilyName = document.getElementById('header-family-name');
+  const elFamilySelect = document.getElementById('header-family-select');
+  
+  if (elFamilyName && elFamilySelect) {
+    if (groups.length > 1) {
+      elFamilyName.style.display = 'none';
+      elFamilySelect.style.display = 'inline-block';
+      
+      const currentOptions = Array.from(elFamilySelect.options).map(o => o.value).join(',');
+      const newOptions = groups.map(g => g.id).join(',');
+      
+      if (currentOptions !== newOptions) {
+        elFamilySelect.innerHTML = '';
+        groups.forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g.id;
+          opt.textContent = g.name || g.id;
+          opt.selected = (g.id === state.groupId);
+          elFamilySelect.appendChild(opt);
+        });
+      } else {
+        elFamilySelect.value = state.groupId;
+      }
+    } else {
+      elFamilyName.style.display = 'inline';
+      elFamilySelect.style.display = 'none';
+      elFamilyName.textContent = state.groupName || 'המשפחה שלי';
+    }
+  }
+
   const elSubtitle = document.querySelector('.logo-section p');
   if (elSubtitle && state.groupName) {
     elSubtitle.textContent = `קבוצה משפחתית: ${state.groupName}`;
@@ -513,7 +575,6 @@ function performStateUpdate() {
       }
     });
 
-    populateAdminAssigneeSelect();
     populateTaskAssigneeFilter();
 
     const defaultFilter = 'my';
@@ -623,7 +684,7 @@ function loadFallbackLocalData() {
   showToast("המערכת פועלת במצב מקומי (Offline Fallback) עקב שגיאת התחברות ל-Firebase", "warning");
 }
 
-const CURRENT_VERSION = '1.6.6';
+const CURRENT_VERSION = '1.13.3';
 
 async function checkVersionAndBustCache() {
   try {
@@ -642,13 +703,886 @@ async function checkVersionAndBustCache() {
   } catch (err) {
     console.warn("[CacheBuster] Failed to check version, proceeding normally:", err);
   }
-  return false;
+}
+
+function updateCustomAssigneeScrollIndicator(selectorId, indicatorId) {
+  const selector = document.getElementById(selectorId);
+  const indicator = document.getElementById(indicatorId);
+  if (!selector || !indicator) return;
+
+  const hasOverflow = selector.scrollWidth > selector.clientWidth;
+  const canScrollLeft = Math.abs(selector.scrollLeft) < (selector.scrollWidth - selector.clientWidth - 10);
+  
+  if (hasOverflow && canScrollLeft) {
+    indicator.style.display = 'flex';
+  } else {
+    indicator.style.display = 'none';
+  }
+}
+
+function initDueDateOptionSelectors() {
+  const setupSelector = (btnSelector, inputId, containerId, summaryId) => {
+    const buttons = document.querySelectorAll(btnSelector);
+    const input = document.getElementById(inputId);
+    const container = document.getElementById(containerId);
+    const summary = document.getElementById(summaryId);
+    if (!input || !container) return;
+    
+    const updateActiveButton = () => {
+      const val = input.value;
+      buttons.forEach(btn => {
+        btn.style.background = 'rgba(255,255,255,0.02)';
+        btn.style.borderColor = 'var(--border-color)';
+        btn.style.color = 'var(--text-secondary)';
+      });
+      
+      if (!val) {
+        container.style.display = 'none';
+        if (summary) {
+          summary.style.display = 'block';
+          summary.innerHTML = '📅 ללא תאריך יעד (משימה פתוחה)';
+        }
+        return;
+      }
+      
+      const today = new Date();
+      const tomorrowStr = getYYYYMMDD(new Date(today.getTime() + 24 * 60 * 60 * 1000));
+      const nextWeekStr = getYYYYMMDD(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000));
+      
+      if (val === tomorrowStr) {
+        const tomorrowBtn = Array.from(buttons).find(b => b.dataset.option === 'tomorrow');
+        if (tomorrowBtn) {
+          tomorrowBtn.style.background = 'rgba(139, 92, 246, 0.15)';
+          tomorrowBtn.style.borderColor = 'var(--accent-purple)';
+          tomorrowBtn.style.color = 'var(--accent-purple)';
+        }
+        container.style.display = 'none';
+        if (summary) {
+          summary.style.display = 'block';
+          summary.innerHTML = `📅 יעד לביצוע: מחר (${formatDateHebrew(val)})`;
+        }
+      } else if (val === nextWeekStr) {
+        const nextWeekBtn = Array.from(buttons).find(b => b.dataset.option === 'next-week');
+        if (nextWeekBtn) {
+          nextWeekBtn.style.background = 'rgba(139, 92, 246, 0.15)';
+          nextWeekBtn.style.borderColor = 'var(--accent-purple)';
+          nextWeekBtn.style.color = 'var(--accent-purple)';
+        }
+        container.style.display = 'none';
+        if (summary) {
+          summary.style.display = 'block';
+          summary.innerHTML = `📅 יעד לביצוע: שבוע הבא (${formatDateHebrew(val)})`;
+        }
+      } else {
+        const customBtn = Array.from(buttons).find(b => b.dataset.option === 'custom');
+        if (customBtn) {
+          customBtn.style.background = 'rgba(139, 92, 246, 0.15)';
+          customBtn.style.borderColor = 'var(--accent-purple)';
+          customBtn.style.color = 'var(--accent-purple)';
+        }
+        container.style.display = 'block';
+        if (summary) {
+          summary.style.display = 'block';
+          summary.innerHTML = `📅 יעד לביצוע: תאריך מותאם (${formatDateHebrew(val)})`;
+        }
+      }
+    };
+    
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const option = btn.dataset.option;
+        const today = new Date();
+        
+        if (option === 'tomorrow') {
+          const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+          input.value = getYYYYMMDD(tomorrow);
+        } else if (option === 'next-week') {
+          const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+          input.value = getYYYYMMDD(nextWeek);
+        } else if (option === 'custom') {
+          // If already custom, leave it, else default to today
+          if (!input.value || input.value === getYYYYMMDD(new Date(today.getTime() + 24 * 60 * 60 * 1000)) || input.value === getYYYYMMDD(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000))) {
+            input.value = getYYYYMMDD(today);
+          }
+          updateActiveButton();
+          if (typeof input.showPicker === 'function') {
+            try { input.showPicker(); } catch(e) {}
+          }
+        }
+        input.dispatchEvent(new Event('change'));
+      });
+    });
+    
+    // Listen to manual date changes to keep buttons in sync
+    input.addEventListener('change', updateActiveButton);
+    
+    // Run initially
+    updateActiveButton();
+  };
+  
+  setupSelector('.due-option-btn', 'admin-task-due-date', 'custom-date-input-container', 'due-date-summary');
+  setupSelector('.edit-due-option-btn', 'admin-edit-task-due-date', 'edit-custom-date-input-container', 'edit-due-date-summary');
+}
+
+function getYYYYMMDD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function initFastCreateTaskModal() {
+  const elOverlay = document.getElementById('create-task-overlay');
+  const elCloseBtn = document.getElementById('fast-create-task-close-btn');
+  const elOpenBtn = document.getElementById('menu-card-add-task');
+  const elForm = document.getElementById('fast-admin-form');
+  const elTitle = document.getElementById('fast-task-title');
+  const elFastAssignee = document.getElementById('fast-task-assignee');
+  const elFastCustomSelector = document.getElementById('fast-task-assignee-custom-selector');
+  const elExpandBtn = document.getElementById('fast-task-expand-btn');
+  const elExpandArrow = document.getElementById('fast-expand-arrow');
+  const elExpandedContent = document.getElementById('fast-task-expanded-content');
+  const elPaymentType = document.getElementById('fast-task-payment-type');
+  const elRewardStarsGroup = document.getElementById('fast-reward-stars-group');
+  const elRewardStars = document.getElementById('fast-reward-stars');
+  const elRewardAmountGroup = document.getElementById('fast-reward-amount-group');
+  const elReward = document.getElementById('fast-reward');
+  const elDesc = document.getElementById('fast-task-desc');
+  const elFastIsRecurring = document.getElementById('fast-is-recurring');
+  const elRecurringConfigGroup = document.getElementById('fast-recurring-config-group');
+  const elFastIsShared = document.getElementById('fast-is-shared');
+  const elMultiAssigneeGroup = document.getElementById('fast-multi-assignee-group');
+  const elFastMultiAssigneeList = document.getElementById('fast-multi-assignee-list');
+  const elDueDate = document.getElementById('fast-task-due-date');
+  const elFreqTimes = document.getElementById('fast-recurring-frequency-times');
+  const elFreqPeriod = document.getElementById('fast-recurring-frequency-period');
+
+  if (!elOverlay || !elOpenBtn) return;
+
+  // Setup star rating
+  setupStarRating('fast-star-rating', 'fast-reward-stars');
+
+  // Setup expandable toggle
+  let isExpanded = false;
+  elExpandBtn.addEventListener('click', () => {
+    isExpanded = !isExpanded;
+    elExpandedContent.style.display = isExpanded ? 'block' : 'none';
+    elExpandArrow.style.transform = isExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+  });
+
+  // Setup payment type change
+  elPaymentType.addEventListener('change', () => {
+    const val = elPaymentType.value;
+    if (val === 'volunteer') {
+      elRewardStarsGroup.style.display = 'block';
+      elRewardAmountGroup.style.display = 'none';
+    } else {
+      elRewardStarsGroup.style.display = 'none';
+      elRewardAmountGroup.style.display = 'block';
+    }
+  });
+
+  // Setup recurring checkbox toggle
+  elFastIsRecurring.addEventListener('change', () => {
+    elRecurringConfigGroup.style.display = elFastIsRecurring.checked ? 'block' : 'none';
+  });
+
+  // Setup shared checkbox toggle
+  elFastIsShared.addEventListener('change', () => {
+    const isShared = elFastIsShared.checked;
+    elMultiAssigneeGroup.style.display = isShared ? 'block' : 'none';
+    
+    // Hide single assignee when shared
+    const fastAssigneeGroup = elFastAssignee.closest('.form-group');
+    if (fastAssigneeGroup) {
+      fastAssigneeGroup.style.display = isShared ? 'none' : 'block';
+    }
+    
+    if (isShared) {
+      renderFastMultiAssigneeList();
+    }
+  });
+
+  // Setup due date segmented option click handler
+  const setupFastDueDateOptions = () => {
+    const buttons = document.querySelectorAll('.fast-due-option-btn');
+    const container = document.getElementById('fast-custom-date-input-container');
+    const summary = document.getElementById('fast-due-date-summary');
+    if (!buttons || !elDueDate || !container) return;
+    
+    const updateActiveButton = () => {
+      const val = elDueDate.value;
+      buttons.forEach(btn => {
+        btn.style.background = 'rgba(255,255,255,0.02)';
+        btn.style.borderColor = 'var(--border-color)';
+        btn.style.color = 'var(--text-secondary)';
+      });
+      
+      if (!val) {
+        container.style.display = 'none';
+        if (summary) {
+          summary.style.display = 'block';
+          summary.innerHTML = '📅 ללא תאריך יעד (משימה פתוחה)';
+        }
+        return;
+      }
+      
+      const today = new Date();
+      const tomorrowStr = getYYYYMMDD(new Date(today.getTime() + 24 * 60 * 60 * 1000));
+      const nextWeekStr = getYYYYMMDD(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000));
+      
+      if (val === tomorrowStr) {
+        const btn = Array.from(buttons).find(b => b.dataset.option === 'tomorrow');
+        if (btn) {
+          btn.style.background = 'rgba(139, 92, 246, 0.15)';
+          btn.style.borderColor = 'var(--accent-purple)';
+          btn.style.color = 'var(--accent-purple)';
+        }
+        container.style.display = 'none';
+        if (summary) {
+          summary.style.display = 'block';
+          summary.innerHTML = `📅 יעד לביצוע: מחר (${formatDateHebrew(val)})`;
+        }
+      } else if (val === nextWeekStr) {
+        const btn = Array.from(buttons).find(b => b.dataset.option === 'next-week');
+        if (btn) {
+          btn.style.background = 'rgba(139, 92, 246, 0.15)';
+          btn.style.borderColor = 'var(--accent-purple)';
+          btn.style.color = 'var(--accent-purple)';
+        }
+        container.style.display = 'none';
+        if (summary) {
+          summary.style.display = 'block';
+          summary.innerHTML = `📅 יעד לביצוע: שבוע הבא (${formatDateHebrew(val)})`;
+        }
+      } else {
+        const btn = Array.from(buttons).find(b => b.dataset.option === 'custom');
+        if (btn) {
+          btn.style.background = 'rgba(139, 92, 246, 0.15)';
+          btn.style.borderColor = 'var(--accent-purple)';
+          btn.style.color = 'var(--accent-purple)';
+        }
+        container.style.display = 'block';
+        if (summary) {
+          summary.style.display = 'block';
+          summary.innerHTML = `📅 יעד לביצוע: תאריך מותאם (${formatDateHebrew(val)})`;
+        }
+      }
+    };
+    
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const option = btn.dataset.option;
+        const today = new Date();
+        if (option === 'tomorrow') {
+          elDueDate.value = getYYYYMMDD(new Date(today.getTime() + 24 * 60 * 60 * 1000));
+        } else if (option === 'next-week') {
+          elDueDate.value = getYYYYMMDD(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000));
+        } else if (option === 'custom') {
+          if (!elDueDate.value || elDueDate.value === getYYYYMMDD(new Date(today.getTime() + 24 * 60 * 60 * 1000)) || elDueDate.value === getYYYYMMDD(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000))) {
+            elDueDate.value = getYYYYMMDD(today);
+          }
+          updateActiveButton();
+          if (typeof elDueDate.showPicker === 'function') {
+            try { elDueDate.showPicker(); } catch(e) {}
+          }
+        }
+        elDueDate.dispatchEvent(new Event('change'));
+      });
+    });
+    
+    elDueDate.addEventListener('change', updateActiveButton);
+    updateActiveButton();
+  };
+  setupFastDueDateOptions();
+
+  // Custom assignee list helpers
+  function renderFastCustomAssigneeSelector() {
+    if (!elFastCustomSelector) return;
+    elFastCustomSelector.innerHTML = '';
+    
+    const currentVal = elFastAssignee.value;
+    const isAllActive = currentVal === 'all';
+    
+    // Everyone circle
+    const allOption = document.createElement('div');
+    allOption.style.display = 'flex';
+    allOption.style.flexDirection = 'column';
+    allOption.style.alignItems = 'center';
+    allOption.style.cursor = 'pointer';
+    allOption.style.userSelect = 'none';
+    allOption.style.flexShrink = '0';
+    
+    allOption.innerHTML = `
+      <div class="assignee-avatar-circle" style="position: relative; width: 62px; height: 62px; border-radius: 50%; border: 3px solid ${isAllActive ? '#3b82f6' : 'rgba(255,255,255,0.08)'}; background: ${isAllActive ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255,255,255,0.02)'}; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; transition: var(--transition-smooth); box-shadow: ${isAllActive ? '0 0 10px rgba(59, 130, 246, 0.25)' : 'none'};">
+        👪
+        <div class="checkmark-badge" style="position: absolute; bottom: -2px; left: -2px; width: 22px; height: 22px; border-radius: 50%; background: #3b82f6; border: 2.5px solid #1a0f30; display: ${isAllActive ? 'flex' : 'none'}; align-items: center; justify-content: center; color: white; font-size: 0.75rem; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">✓</div>
+      </div>
+      <span style="font-size: 0.85rem; font-weight: 700; color: ${isAllActive ? 'var(--text-primary)' : 'var(--text-secondary)'}; margin-top: 6px; text-align: center;">כולם</span>
+    `;
+    
+    allOption.addEventListener('click', () => {
+      elFastAssignee.value = 'all';
+      renderFastCustomAssigneeSelector();
+    });
+    elFastCustomSelector.appendChild(allOption);
+    
+    // User circles
+    state.users.forEach(u => {
+      const isActive = currentVal === u.id;
+      const userOption = document.createElement('div');
+      userOption.style.display = 'flex';
+      userOption.style.flexDirection = 'column';
+      userOption.style.alignItems = 'center';
+      userOption.style.cursor = 'pointer';
+      userOption.style.userSelect = 'none';
+      userOption.style.flexShrink = '0';
+      
+      const firstName = u.name.split(' ')[0];
+      
+      userOption.innerHTML = `
+        <div class="assignee-avatar-circle" style="position: relative; width: 62px; height: 62px; border-radius: 50%; border: 3px solid ${isActive ? '#3b82f6' : 'rgba(255,255,255,0.08)'}; background: ${isActive ? 'rgba(59, 130, 246, 0.08)' : 'rgba(255,255,255,0.02)'}; display: flex; align-items: center; justify-content: center; overflow: visible; transition: var(--transition-smooth); box-shadow: ${isActive ? '0 0 10px rgba(59, 130, 246, 0.25)' : 'none'};">
+          <span style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; font-size: 1.8rem;">${getAvatarHTML(u.avatar)}</span>
+          <div class="checkmark-badge" style="position: absolute; bottom: -2px; left: -2px; width: 22px; height: 22px; border-radius: 50%; background: #3b82f6; border: 2.5px solid #1a0f30; display: ${isActive ? 'flex' : 'none'}; align-items: center; justify-content: center; color: white; font-size: 0.75rem; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">✓</div>
+        </div>
+        <span style="font-size: 0.85rem; font-weight: 700; color: ${isActive ? 'var(--text-primary)' : 'var(--text-secondary)'}; margin-top: 6px; text-align: center;">${firstName}</span>
+      `;
+      
+      userOption.addEventListener('click', () => {
+        elFastAssignee.value = u.id;
+        renderFastCustomAssigneeSelector();
+      });
+      elFastCustomSelector.appendChild(userOption);
+    });
+
+    setTimeout(() => {
+      updateCustomAssigneeScrollIndicator('fast-task-assignee-custom-selector', 'fast-assignee-scroll-indicator');
+    }, 50);
+  }
+
+  if (elFastCustomSelector) {
+    elFastCustomSelector.addEventListener('scroll', () => {
+      updateCustomAssigneeScrollIndicator('fast-task-assignee-custom-selector', 'fast-assignee-scroll-indicator');
+    });
+  }
+
+  function renderFastMultiAssigneeList() {
+    if (!elFastMultiAssigneeList) return;
+    elFastMultiAssigneeList.innerHTML = '';
+    
+    const selectedUsers = selectedSharedQueue.map(uid => state.users.find(u => u.id === uid)).filter(Boolean);
+    const unselectedUsers = state.users.filter(u => !selectedSharedQueue.includes(u.id));
+    const allListUsers = [...selectedUsers, ...unselectedUsers];
+    
+    allListUsers.forEach((u, idx) => {
+      const isChecked = selectedSharedQueue.includes(u.id);
+      const queueIndex = selectedSharedQueue.indexOf(u.id);
+      
+      const div = document.createElement('div');
+      div.className = 'draggable-user-item';
+      div.draggable = isChecked;
+      div.dataset.userId = u.id;
+      div.style.display = 'flex';
+      div.style.alignItems = 'center';
+      div.style.gap = '10px';
+      div.style.padding = '8px 12px';
+      div.style.background = isChecked ? 'rgba(139, 92, 246, 0.08)' : 'transparent';
+      div.style.border = isChecked ? '1px solid rgba(139, 92, 246, 0.2)' : '1px solid transparent';
+      div.style.borderRadius = 'var(--border-radius-md)';
+      div.style.cursor = isChecked ? 'grab' : 'default';
+      div.style.transition = 'background-color 0.2s, border-color 0.2s';
+      
+      div.innerHTML = `
+        <div style="font-size: 1.1rem; color: var(--text-muted); cursor: grab; display: ${isChecked ? 'block' : 'none'}; user-select: none;">☰</div>
+        <input type="checkbox" id="fast-multi-assignee-check-${u.id}" ${isChecked ? 'checked' : ''} style="width: 20px; height: 20px; accent-color: var(--accent-purple); cursor: pointer;">
+        <label for="fast-multi-assignee-check-${u.id}" style="cursor: pointer; user-select: none; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-grow: 1; margin: 0;">
+          <span style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 50%; font-size: 1.2rem; flex-shrink: 0;">${getAvatarHTML(u.avatar)}</span>
+          <span>${u.name}</span>
+        </label>
+        <div style="display: ${isChecked ? 'flex' : 'none'}; align-items: center; gap: 6px;">
+          <button type="button" class="btn-arrow" onclick="event.stopPropagation(); window.moveFastAssigneeUp('${u.id}')">▲</button>
+          <button type="button" class="btn-arrow" onclick="event.stopPropagation(); window.moveFastAssigneeDown('${u.id}')">▼</button>
+          <span style="font-weight: bold; color: var(--accent-purple); background: rgba(139, 92, 246, 0.15); padding: 4px 10px; border-radius: 50px; font-size: 0.8rem;">${queueIndex + 1}</span>
+        </div>
+      `;
+      
+      const checkbox = div.querySelector('input[type="checkbox"]');
+      checkbox.addEventListener('click', (e) => e.stopPropagation());
+      checkbox.addEventListener('mousedown', (e) => e.stopPropagation());
+      checkbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          if (!selectedSharedQueue.includes(u.id)) {
+            selectedSharedQueue.push(u.id);
+          }
+        } else {
+          selectedSharedQueue = selectedSharedQueue.filter(id => id !== u.id);
+        }
+        renderFastMultiAssigneeList();
+      });
+      
+      // Drag & Drop event listeners
+      div.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', u.id);
+        div.style.opacity = '0.5';
+      });
+      div.addEventListener('dragend', () => {
+        div.style.opacity = '1';
+      });
+      div.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        div.style.background = 'rgba(139, 92, 246, 0.15)';
+      });
+      div.addEventListener('dragleave', () => {
+        div.style.background = isChecked ? 'rgba(139, 92, 246, 0.08)' : 'transparent';
+      });
+      div.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (draggedId && draggedId !== u.id) {
+          const draggedIndex = selectedSharedQueue.indexOf(draggedId);
+          const targetIndex = selectedSharedQueue.indexOf(u.id);
+          if (draggedIndex !== -1 && targetIndex !== -1) {
+            selectedSharedQueue.splice(draggedIndex, 1);
+            selectedSharedQueue.splice(targetIndex, 0, draggedId);
+            renderFastMultiAssigneeList();
+          }
+        }
+      });
+      
+      elFastMultiAssigneeList.appendChild(div);
+    });
+  }
+
+  window.moveFastAssigneeUp = function(userId) {
+    const index = selectedSharedQueue.indexOf(userId);
+    if (index > 0) {
+      const temp = selectedSharedQueue[index];
+      selectedSharedQueue[index] = selectedSharedQueue[index - 1];
+      selectedSharedQueue[index - 1] = temp;
+      renderFastMultiAssigneeList();
+    }
+  };
+
+  window.moveFastAssigneeDown = function(userId) {
+    const index = selectedSharedQueue.indexOf(userId);
+    if (index !== -1 && index < selectedSharedQueue.length - 1) {
+      const temp = selectedSharedQueue[index];
+      selectedSharedQueue[index] = selectedSharedQueue[index + 1];
+      selectedSharedQueue[index + 1] = temp;
+      renderFastMultiAssigneeList();
+    }
+  };
+
+  // Open modal trigger
+  elOpenBtn.addEventListener('click', () => {
+    // Populate hidden select options
+    elFastAssignee.innerHTML = '<option value="" disabled selected>בחר בן משפחה...</option>';
+    elFastAssignee.innerHTML += `<option value="all">👥 כל בני המשפחה</option>`;
+    state.users.forEach(u => {
+      elFastAssignee.innerHTML += `<option value="${u.id}">${u.name}</option>`;
+    });
+
+    // Reset all inputs
+    elTitle.value = '';
+    elFastAssignee.value = 'all';
+    elDueDate.value = '';
+    elDueDate.dispatchEvent(new Event('change'));
+    
+    // Collapse expandable content initially
+    isExpanded = false;
+    elExpandedContent.style.display = 'none';
+    elExpandArrow.style.transform = 'rotate(0deg)';
+    
+    // Reset expanded form elements
+    elPaymentType.value = 'volunteer';
+    elPaymentType.dispatchEvent(new Event('change'));
+    window.setStarRatingValue('fast-star-rating', 'fast-reward-stars', 1);
+    elReward.value = '0';
+    elDesc.value = '';
+    
+    elFastIsRecurring.checked = false;
+    elRecurringConfigGroup.style.display = 'none';
+    elFreqTimes.value = '1';
+    elFreqPeriod.value = 'day';
+    
+    elFastIsShared.checked = false;
+    elMultiAssigneeGroup.style.display = 'none';
+    const fastAssigneeGroup = elFastAssignee.closest('.form-group');
+    if (fastAssigneeGroup) fastAssigneeGroup.style.display = 'block';
+    
+    selectedSharedQueue = [];
+    
+    renderFastCustomAssigneeSelector();
+    
+    elOverlay.classList.add('active');
+    setTimeout(() => {
+      updateCustomAssigneeScrollIndicator('fast-task-assignee-custom-selector', 'fast-assignee-scroll-indicator');
+    }, 350);
+  });
+
+  // Close modal trigger
+  const closeModal = () => {
+    elOverlay.classList.remove('active');
+  };
+  elCloseBtn.addEventListener('click', closeModal);
+  elOverlay.addEventListener('click', (e) => {
+    if (e.target === elOverlay) closeModal();
+  });
+
+  // Handle form submission
+  elForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const title = elTitle.value.trim();
+      if (!title) {
+        showToast('נא להזין כותרת למשימה', 'warning');
+        return;
+      }
+      
+      const description = elDesc.value.trim();
+      const isShared = elFastIsShared.checked;
+      const isRecurring = elFastIsRecurring.checked;
+      const paymentType = elPaymentType.value;
+      
+      const reward = paymentType === 'paid' && elReward.value ? parseFloat(elReward.value) : 0;
+      const stars = paymentType === 'volunteer' ? parseInt(elRewardStars.value) || 1 : 0;
+      
+      let assignedTo = '';
+      if (isShared) {
+        if (selectedSharedQueue.length === 0) {
+          showToast('נא לבחור לפחות בן משפחה אחד למשימה המשותפת', 'warning');
+          return;
+        }
+        assignedTo = selectedSharedQueue[0];
+      } else {
+        assignedTo = elFastAssignee.value;
+        if (!assignedTo) {
+          showToast('נא לבחור בן משפחה לביצוע המשימה', 'warning');
+          return;
+        }
+      }
+      
+      let dueDate = elDueDate.value || '';
+      let recurringStartDate = null;
+      let recurringEndDate = null;
+      let recurringFrequencyTimes = null;
+      let recurringFrequencyPeriod = null;
+      
+      if (isRecurring) {
+        const today = new Date();
+        recurringStartDate = getYYYYMMDD(today);
+        // Recurring task has no end date by default (1 year limit fallback)
+        recurringEndDate = getYYYYMMDD(new Date(today.getTime() + 365 * 24 * 60 * 60 * 1000));
+        
+        recurringFrequencyTimes = parseInt(elFreqTimes.value || '1');
+        recurringFrequencyPeriod = elFreqPeriod.value;
+      }
+
+      const newTask = {
+        id: `${state.groupId}-task-${Date.now()}`,
+        groupId: state.groupId,
+        title,
+        description,
+        assignedTo,
+        type: isRecurring ? 'recurring' : 'one-off',
+        recurrence: isRecurring ? 'custom' : null,
+        isShared,
+        sharedQueue: isShared ? selectedSharedQueue : [],
+        sharedCurrentIndex: 0,
+        isRecurring,
+        recurringStartDate,
+        recurringEndDate,
+        recurringFrequencyTimes,
+        recurringFrequencyPeriod,
+        reward,
+        stars,
+        dueDate,
+        time: '',
+        dayOfWeek: null,
+        hasReminder: false,
+        reminderDateTime: null,
+        status: 'new',
+        completedBy: null,
+        completedDate: null,
+        createdBy: state.currentUser ? state.currentUser.id : null,
+        order: state.tasks.length
+      };
+
+      const historyId = `${state.groupId}-hist-${Date.now()}`;
+      const historyEntry = {
+        id: historyId,
+        groupId: state.groupId,
+        taskId: newTask.id,
+        title: newTask.title,
+        action: 'created',
+        reward: newTask.reward,
+        stars: newTask.stars,
+        completedBy: state.currentUser ? state.currentUser.id : null,
+        completedDate: formatDateString(new Date()),
+        timestamp: new Date().toISOString()
+      };
+
+      if (state.groupId === 'local-sandbox') {
+        state.tasks.push(newTask);
+        state.history.push(historyEntry);
+        
+        // Email notification for Mom if task is assigned to her
+        const assignedUser = state.users.find(u => u.id === newTask.assignedTo);
+        if (assignedUser && (assignedUser.name === 'אמא' || assignedUser.id.endsWith('user-mom')) && assignedUser.email) {
+          try {
+            sendTaskCreatedEmail(newTask, assignedUser);
+          } catch (mailErr) {
+            console.error("Failed to send task creation email to Mom in local-sandbox:", mailErr);
+          }
+        }
+        
+        saveState();
+        closeModal();
+        localStorage.setItem('household_active_tab', 'tasks');
+        localStorage.setItem('household_pending_toast', JSON.stringify({
+          message: `המשימה "${title}" נוצרה בהצלחה!`,
+          type: 'success'
+        }));
+        window.location.reload();
+        return;
+      }
+
+      try {
+        await db.collection('tasks').doc(newTask.id).set(newTask);
+        await db.collection('history').doc(historyId).set(historyEntry);
+        
+        // Email notification for Mom if task is assigned to her
+        const assignedUser = state.users.find(u => u.id === newTask.assignedTo);
+        if (assignedUser && (assignedUser.name === 'אמא' || assignedUser.id.endsWith('user-mom')) && assignedUser.email) {
+          try {
+            await sendTaskCreatedEmail(newTask, assignedUser);
+          } catch (mailErr) {
+            console.error("Failed to send task creation email to Mom:", mailErr);
+          }
+        }
+      } catch (err) {
+        console.error("Firebase save task failed:", err);
+      }
+      
+      saveState();
+      closeModal();
+      localStorage.setItem('household_active_tab', 'tasks');
+      localStorage.setItem('household_pending_toast', JSON.stringify({
+        message: `המשימה "${title}" נוצרה בהצלחה!`,
+        type: 'success'
+      }));
+      window.location.reload();
+    } catch (err) {
+      console.error("Fast submit error:", err);
+      showToast("שגיאה ביצירת המשימה: " + err.message, "danger");
+    }
+  });
+}
+
+window.editSelectedSharedQueue = [];
+
+window.renderEditMultiAssigneeList = function() {
+  const elEditMultiAssigneeList = document.getElementById('edit-multi-assignee-list');
+  if (!elEditMultiAssigneeList) return;
+  elEditMultiAssigneeList.innerHTML = '';
+  
+  const selectedUsers = window.editSelectedSharedQueue.map(uid => state.users.find(u => u.id === uid)).filter(Boolean);
+  const unselectedUsers = state.users.filter(u => !window.editSelectedSharedQueue.includes(u.id));
+  const allListUsers = [...selectedUsers, ...unselectedUsers];
+  
+  allListUsers.forEach((u, idx) => {
+    const isChecked = window.editSelectedSharedQueue.includes(u.id);
+    const queueIndex = window.editSelectedSharedQueue.indexOf(u.id);
+    
+    const div = document.createElement('div');
+    div.className = 'draggable-user-item';
+    div.draggable = isChecked;
+    div.dataset.userId = u.id;
+    div.style.display = 'flex';
+    div.style.alignItems = 'center';
+    div.style.gap = '10px';
+    div.style.padding = '8px 12px';
+    div.style.background = isChecked ? 'rgba(139, 92, 246, 0.08)' : 'transparent';
+    div.style.border = isChecked ? '1px solid rgba(139, 92, 246, 0.2)' : '1px solid transparent';
+    div.style.borderRadius = 'var(--border-radius-md)';
+    div.style.cursor = isChecked ? 'grab' : 'default';
+    div.style.transition = 'background-color 0.2s, border-color 0.2s';
+    
+    div.innerHTML = `
+      <div style="font-size: 1.1rem; color: var(--text-muted); cursor: grab; display: ${isChecked ? 'block' : 'none'}; user-select: none;">☰</div>
+      <input type="checkbox" id="edit-multi-assignee-check-${u.id}" ${isChecked ? 'checked' : ''} style="width: 20px; height: 20px; accent-color: var(--accent-purple); cursor: pointer;">
+      <label for="edit-multi-assignee-check-${u.id}" style="cursor: pointer; user-select: none; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-grow: 1; margin: 0;">
+        <span style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 50%; font-size: 1.2rem; flex-shrink: 0;">${getAvatarHTML(u.avatar)}</span>
+        <span>${u.name}</span>
+      </label>
+      <div style="display: ${isChecked ? 'flex' : 'none'}; align-items: center; gap: 6px;">
+        <button type="button" class="btn-arrow" onclick="event.stopPropagation(); window.moveEditAssigneeUp('${u.id}')">▲</button>
+        <button type="button" class="btn-arrow" onclick="event.stopPropagation(); window.moveEditAssigneeDown('${u.id}')">▼</button>
+        <span style="font-weight: bold; color: var(--accent-purple); background: rgba(139, 92, 246, 0.15); padding: 4px 10px; border-radius: 50px; font-size: 0.8rem;">${queueIndex + 1}</span>
+      </div>
+    `;
+    
+    const checkbox = div.querySelector('input[type="checkbox"]');
+    checkbox.addEventListener('click', (e) => e.stopPropagation());
+    checkbox.addEventListener('mousedown', (e) => e.stopPropagation());
+    checkbox.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        if (!window.editSelectedSharedQueue.includes(u.id)) {
+          window.editSelectedSharedQueue.push(u.id);
+        }
+      } else {
+        window.editSelectedSharedQueue = window.editSelectedSharedQueue.filter(id => id !== u.id);
+      }
+      window.renderEditMultiAssigneeList();
+    });
+    
+    // Drag & Drop event listeners
+    div.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', u.id);
+      div.style.opacity = '0.5';
+    });
+    div.addEventListener('dragend', () => {
+      div.style.opacity = '1';
+    });
+    div.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      div.style.background = 'rgba(139, 92, 246, 0.15)';
+    });
+    div.addEventListener('dragleave', () => {
+      div.style.background = isChecked ? 'rgba(139, 92, 246, 0.08)' : 'transparent';
+    });
+    div.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const draggedId = e.dataTransfer.getData('text/plain');
+      if (draggedId && draggedId !== u.id) {
+        const draggedIndex = window.editSelectedSharedQueue.indexOf(draggedId);
+        const targetIndex = window.editSelectedSharedQueue.indexOf(u.id);
+        if (draggedIndex !== -1 && targetIndex !== -1) {
+          window.editSelectedSharedQueue.splice(draggedIndex, 1);
+          window.editSelectedSharedQueue.splice(targetIndex, 0, draggedId);
+          window.renderEditMultiAssigneeList();
+        }
+      }
+    });
+    
+    elEditMultiAssigneeList.appendChild(div);
+  });
+};
+
+window.moveEditAssigneeUp = function(userId) {
+  const index = window.editSelectedSharedQueue.indexOf(userId);
+  if (index > 0) {
+    const temp = window.editSelectedSharedQueue[index];
+    window.editSelectedSharedQueue[index] = window.editSelectedSharedQueue[index - 1];
+    window.editSelectedSharedQueue[index - 1] = temp;
+    window.renderEditMultiAssigneeList();
+  }
+};
+
+window.moveEditAssigneeDown = function(userId) {
+  const index = window.editSelectedSharedQueue.indexOf(userId);
+  if (index !== -1 && index < window.editSelectedSharedQueue.length - 1) {
+    const temp = window.editSelectedSharedQueue[index];
+    window.editSelectedSharedQueue[index] = window.editSelectedSharedQueue[index + 1];
+    window.editSelectedSharedQueue[index + 1] = temp;
+    window.renderEditMultiAssigneeList();
+  }
+};
+
+function initEditTaskModalController() {
+  const elEditOverlay = document.getElementById('edit-task-overlay');
+  const elEditCloseBtn = document.getElementById('edit-task-close-btn');
+  const elEditExpandBtn = document.getElementById('edit-task-expand-btn');
+  const elEditExpandArrow = document.getElementById('edit-expand-arrow');
+  const elEditExpandedContent = document.getElementById('edit-task-expanded-content');
+  const elEditPaymentType = document.getElementById('admin-edit-task-payment-type');
+  const elEditRewardStarsGroup = document.getElementById('edit-reward-stars-group');
+  const elEditRewardStars = document.getElementById('admin-edit-task-reward-stars');
+  const elEditRewardAmountGroup = document.getElementById('edit-reward-amount-group');
+  const elEditReward = document.getElementById('admin-edit-task-reward');
+  const elEditIsRecurring = document.getElementById('admin-edit-task-is-recurring');
+  const elEditRecurringConfigGroup = document.getElementById('edit-recurring-config-group');
+  const elEditHasReminder = document.getElementById('admin-edit-task-has-reminder');
+  const elEditReminderConfigGroup = document.getElementById('edit-reminder-config-group');
+  const elEditIsShared = document.getElementById('admin-edit-task-is-shared');
+  const elEditMultiAssigneeGroup = document.getElementById('edit-multi-assignee-group');
+  const elEditAssignee = document.getElementById('admin-edit-task-assignee');
+
+  if (!elEditOverlay) return;
+
+  // Setup star rating click interaction for edit star rating element
+  setupStarRating('edit-star-rating', 'admin-edit-task-reward-stars');
+
+  // Setup expandable settings toggle
+  let isEditExpanded = false;
+  elEditExpandBtn.addEventListener('click', () => {
+    isEditExpanded = !isEditExpanded;
+    elEditExpandedContent.style.display = isEditExpanded ? 'block' : 'none';
+    elEditExpandArrow.style.transform = isEditExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+  });
+
+  // Setup payment type change
+  elEditPaymentType.addEventListener('change', () => {
+    const val = elEditPaymentType.value;
+    if (val === 'volunteer') {
+      elEditRewardStarsGroup.style.display = 'block';
+      elEditRewardAmountGroup.style.display = 'none';
+    } else {
+      elEditRewardStarsGroup.style.display = 'none';
+      elEditRewardAmountGroup.style.display = 'block';
+    }
+  });
+
+  // Setup recurring checkbox toggle
+  elEditIsRecurring.addEventListener('change', () => {
+    elEditRecurringConfigGroup.style.display = elEditIsRecurring.checked ? 'block' : 'none';
+  });
+
+  // Setup shared checkbox toggle
+  if (elEditIsShared && elEditMultiAssigneeGroup) {
+    elEditIsShared.addEventListener('change', () => {
+      const isShared = elEditIsShared.checked;
+      elEditMultiAssigneeGroup.style.display = isShared ? 'block' : 'none';
+      
+      const editAssigneeGroup = elEditAssignee ? elEditAssignee.closest('.form-group') : null;
+      if (editAssigneeGroup) {
+        editAssigneeGroup.style.display = isShared ? 'none' : 'block';
+      }
+      
+      if (isShared) {
+        window.renderEditMultiAssigneeList();
+      }
+    });
+  }
+
+  // Setup reminder checkbox toggle
+  elEditHasReminder.addEventListener('change', () => {
+    elEditReminderConfigGroup.style.display = elEditHasReminder.checked ? 'block' : 'none';
+  });
+
+  // Setup close overlay click triggers
+  const closeEditModal = () => {
+    elEditOverlay.classList.remove('active');
+  };
+  elEditCloseBtn.addEventListener('click', closeEditModal);
+  elEditOverlay.addEventListener('click', (e) => {
+    if (e.target === elEditOverlay) closeEditModal();
+  });
 }
 
 async function initApp() {
   // Check version and reload if outdated to bust browser cache
   const isReloading = await checkVersionAndBustCache();
   if (isReloading) return;
+
+  // Initialize due date option selectors
+  initDueDateOptionSelectors();
+
+  // Initialize fast create task modal
+  initFastCreateTaskModal();
+
+  // Initialize edit task modal controller
+  initEditTaskModalController();
 
   // Debug / Reset Query Param helpers
   const urlParams = new URLSearchParams(window.location.search);
@@ -924,6 +1858,7 @@ async function initApp() {
       localStorage.removeItem(`household_history_${currentGroupId}`);
     }
     localStorage.removeItem('household_group_id');
+    localStorage.removeItem('household_connected_groups');
     
     if (currentGroupId && currentGroupId !== 'local-sandbox' && db) {
       try {
@@ -955,14 +1890,7 @@ async function initApp() {
   const hasVisited = localStorage.getItem('household_visited') === 'true';
   const savedProfile = localStorage.getItem('household_user_profile');
   const savedGroupId = localStorage.getItem('household_group_id');
-  
-  console.log("[OnboardingDebug] hasVisited:", hasVisited);
-  console.log("[OnboardingDebug] groupParam:", groupParam);
-  console.log("[OnboardingDebug] savedProfile exists:", !!savedProfile);
-  console.log("[OnboardingDebug] savedGroupId:", savedGroupId);
-  
   if (!hasVisited && !groupParam) {
-    console.log("[OnboardingDebug] Clean landing detected! Displaying welcome overlay.");
     // FIRST LANDING (Clean Entry):
     // 1. Initialize default sandbox profiles in memory/localStorage so background looks beautiful
     const defaultMom = {
@@ -996,16 +1924,8 @@ async function initApp() {
     
     // Ensure onboarding overlays are hidden, but SHOW welcome-overlay
     const welcomeOverlay = document.getElementById('welcome-overlay');
-    console.log("[OnboardingDebug] welcomeOverlay found in DOM:", !!welcomeOverlay);
     if (welcomeOverlay) {
       welcomeOverlay.classList.add('active');
-      console.log("[OnboardingDebug] welcomeOverlay classList after active:", welcomeOverlay.className);
-      setTimeout(() => {
-        const computed = window.getComputedStyle(welcomeOverlay);
-        const rect = welcomeOverlay.getBoundingClientRect();
-        console.log("[OnboardingDebug] Computed styles - Opacity:", computed.opacity, "Display:", computed.display, "Z-Index:", computed.zIndex, "Visibility:", computed.visibility);
-        console.log("[OnboardingDebug] Rect - Width:", rect.width, "Height:", rect.height, "Top:", rect.top, "Left:", rect.left);
-      }, 100);
     }
     
     const groupSetupOverlay = document.getElementById('group-setup-overlay');
@@ -1463,7 +2383,10 @@ function clearCompletedTodayCache() {
   lastCompletedTodayCache.timestamp = 0;
 }
 
-function isTaskCompletedToday(task) {
+function isTaskCompletedToday(task, userId) {
+  const targetUser = userId || task.assignedTo || (state.currentUser ? state.currentUser.id : null);
+  if (!targetUser) return false;
+
   const now = Date.now();
   if (now - lastCompletedTodayCache.timestamp > 1000) {
     const todayStr = formatDateString(new Date());
@@ -1471,6 +2394,9 @@ function isTaskCompletedToday(task) {
     state.history.forEach(h => {
       if (h.completedDate === todayStr && (h.action === 'completed' || h.action === undefined)) {
         set.add(h.taskId);
+        if (h.completedBy) {
+          set.add(`${h.taskId}_${h.completedBy}`);
+        }
       }
     });
     lastCompletedTodayCache = {
@@ -1478,6 +2404,11 @@ function isTaskCompletedToday(task) {
       set: set
     };
   }
+
+  if (task.isShared) {
+    return lastCompletedTodayCache.set.has(`${task.id}_${targetUser}`);
+  }
+
   return lastCompletedTodayCache.set.has(task.id);
 }
 
@@ -1623,6 +2554,21 @@ function switchTab(targetTab) {
 }
 
 function bindEvents() {
+  // Family selector combobox listener
+  const elFamilySelect = document.getElementById('header-family-select');
+  if (elFamilySelect) {
+    elFamilySelect.addEventListener('change', (e) => {
+      if (!e.isTrusted) return; // Prevent loop caused by programmatic option rebuilding
+      const targetGroupId = e.target.value;
+      if (targetGroupId && targetGroupId !== state.groupId) {
+        localStorage.setItem('household_group_id', targetGroupId);
+        localStorage.removeItem('household_current_user');
+        localStorage.removeItem('household_user_profile');
+        window.location.reload();
+      }
+    });
+  }
+
   // Google Sign-In and Sign-Out event listeners
   const elGoogleLoginBtn = document.getElementById('settings-google-login-btn');
   if (elGoogleLoginBtn) {
@@ -1640,6 +2586,39 @@ function bindEvents() {
     elGearBtn.addEventListener('click', () => {
       elFamilySettingsOverlay.classList.add('active');
       renderProfilesList();
+    });
+  }
+
+  // Settings Welcome Transition Button
+  const elSettingsWelcomeBtn = document.getElementById('family-settings-welcome-btn');
+  if (elSettingsWelcomeBtn) {
+    elSettingsWelcomeBtn.addEventListener('click', () => {
+      if (elFamilySettingsOverlay) {
+        elFamilySettingsOverlay.classList.remove('active');
+      }
+      const welcomeOverlay = document.getElementById('welcome-overlay');
+      if (welcomeOverlay) {
+        welcomeOverlay.classList.add('active');
+      }
+      const welcomeCancelBtn = document.getElementById('welcome-cancel-btn');
+      if (welcomeCancelBtn) {
+        welcomeCancelBtn.style.display = 'flex';
+      }
+    });
+  }
+
+  // Welcome Screen Cancel Button (to go back to current group)
+  const elWelcomeCancelBtn = document.getElementById('welcome-cancel-btn');
+  if (elWelcomeCancelBtn) {
+    elWelcomeCancelBtn.addEventListener('click', () => {
+      const welcomeOverlay = document.getElementById('welcome-overlay');
+      if (welcomeOverlay) {
+        welcomeOverlay.classList.remove('active');
+      }
+      const welcomeMainOptions = document.getElementById('welcome-main-options');
+      const welcomeCodeForm = document.getElementById('welcome-code-form');
+      if (welcomeMainOptions) welcomeMainOptions.style.display = 'flex';
+      if (welcomeCodeForm) welcomeCodeForm.style.display = 'none';
     });
   }
 
@@ -1945,48 +2924,17 @@ function bindEvents() {
       document.getElementById('edit-reminder-config-group').style.display = isChecked ? 'block' : 'none';
     });
   }
-
   // Open Create Task Modal
   const elAdminAddTaskBtn = document.getElementById('admin-add-task-btn');
-  const elCreateTaskOverlay = document.getElementById('create-task-overlay');
-  const elCreateTaskCloseBtn = document.getElementById('create-task-close-btn');
-
   const openCreateTaskModal = () => {
-    // Prefill defaults
-    if (document.getElementById('admin-task-due-date')) {
-      document.getElementById('admin-task-due-date').value = '';
-    }
-    if (document.getElementById('admin-recurring-hour')) {
-      document.getElementById('admin-recurring-hour').value = '09';
-    }
-    if (document.getElementById('admin-recurring-minute')) {
-      document.getElementById('admin-recurring-minute').value = '00';
-    }
-    if (document.getElementById('admin-reminder-hour')) {
-      document.getElementById('admin-reminder-hour').value = '12';
-    }
-    if (document.getElementById('admin-reminder-minute')) {
-      document.getElementById('admin-reminder-minute').value = '00';
-    }
-    if (elCreateTaskOverlay) {
-      elCreateTaskOverlay.classList.add('active');
+    const elBtn = document.getElementById('menu-card-add-task');
+    if (elBtn) {
+      elBtn.click();
     }
   };
 
   if (elAdminAddTaskBtn) {
     elAdminAddTaskBtn.addEventListener('click', openCreateTaskModal);
-  }
-
-  // Close Create Task Modal
-  if (elCreateTaskCloseBtn && elCreateTaskOverlay) {
-    elCreateTaskCloseBtn.addEventListener('click', () => {
-      elCreateTaskOverlay.classList.remove('active');
-    });
-    elCreateTaskOverlay.addEventListener('click', (e) => {
-      if (e.target === elCreateTaskOverlay) {
-        elCreateTaskOverlay.classList.remove('active');
-      }
-    });
   }
 
   // Close Edit Task Modal
@@ -2035,201 +2983,7 @@ function bindEvents() {
     });
   }
 
-  // Watch Payment Type changing in form
-  const elPaymentType = document.getElementById('admin-payment-type');
-  if (elPaymentType) {
-    elPaymentType.addEventListener('change', (e) => {
-      const value = e.target.value;
-      const rewardGroup = document.getElementById('reward-amount-group');
-      const starsGroup = document.getElementById('reward-stars-group');
-      if (value === 'paid') {
-        if (rewardGroup) rewardGroup.style.display = 'block';
-        if (starsGroup) starsGroup.style.display = 'none';
-        window.setStarRatingValue('create-star-rating', 'admin-reward-stars', 0);
-      } else {
-        if (rewardGroup) rewardGroup.style.display = 'none';
-        const elReward = document.getElementById('admin-reward');
-        if (elReward) elReward.value = '0';
-        if (starsGroup) starsGroup.style.display = 'block';
-        window.setStarRatingValue('create-star-rating', 'admin-reward-stars', 1);
-      }
-    });
-  }
 
-  // Watch isRecurring checkbox in form
-  const elIsRecurring = document.getElementById('admin-is-recurring');
-  if (elIsRecurring) {
-    elIsRecurring.addEventListener('change', (e) => {
-      const isChecked = e.target.checked;
-      const elRecGroup = document.getElementById('recurring-config-group');
-      if (elRecGroup) elRecGroup.style.display = isChecked ? 'block' : 'none';
-    });
-  }
-
-  // Watch hasReminder checkbox in form
-  const elHasReminder = document.getElementById('admin-has-reminder');
-  if (elHasReminder) {
-    elHasReminder.addEventListener('change', (e) => {
-      const isChecked = e.target.checked;
-      const elRemGroup = document.getElementById('reminder-config-group');
-      if (elRemGroup) elRemGroup.style.display = isChecked ? 'block' : 'none';
-    });
-  }
-
-  // Admin New Task Form submit
-  if (elAdminForm) {
-    elAdminForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    // Get form values
-    const title = document.getElementById('admin-task-title').value.trim();
-    const description = document.getElementById('admin-task-desc').value.trim();
-    const assignedTo = document.getElementById('admin-assignee').value;
-    const paymentType = document.getElementById('admin-payment-type').value;
-    
-    const rewardInput = document.getElementById('admin-reward').value;
-    const reward = paymentType === 'paid' && rewardInput ? parseFloat(rewardInput) : 0;
-    
-    const starsInput = document.getElementById('admin-reward-stars').value;
-    const stars = paymentType === 'volunteer' && starsInput ? parseInt(starsInput) : 0;
-    
-    const isRecurring = document.getElementById('admin-is-recurring').checked;
-    const hasReminder = document.getElementById('admin-has-reminder').checked;
-    
-    // Determine scheduling values
-    let dayOfWeek = null;
-    let dueDate = document.getElementById('admin-task-due-date').value || '';
-    let time = '';
-    let reminderDateTime = null;
-    
-    if (isRecurring) {
-      const recHour = document.getElementById('admin-recurring-hour').value || '09';
-      const recMin = document.getElementById('admin-recurring-minute').value || '00';
-      time = `${recHour}:${recMin}`;
-      dayOfWeek = parseInt(document.getElementById('admin-weekly-day').value);
-    }
-    
-    if (hasReminder) {
-      const remDate = document.getElementById('admin-reminder-date').value;
-      const remHour = document.getElementById('admin-reminder-hour').value || '12';
-      const remMin = document.getElementById('admin-reminder-minute').value || '00';
-      
-      if (remDate) {
-        reminderDateTime = `${remDate}T${remHour}:${remMin}`;
-        if (!dueDate) {
-          dueDate = remDate;
-        }
-        if (!isRecurring) {
-          time = `${remHour}:${remMin}`;
-        }
-      }
-    }
-
-    if (!title) {
-      showToast('נא להזין כותרת למשימה', 'warning');
-      return;
-    }
-
-    if (!assignedTo) {
-      showToast('נא לבחור בן משפחה לביצוע המשימה', 'warning');
-      return;
-    }
-
-    // Add task to state
-    const newTask = {
-      id: `${state.groupId}-task-${Date.now()}`,
-      groupId: state.groupId,
-      title,
-      description,
-      assignedTo,
-      type: isRecurring ? 'recurring' : 'one-off',
-      recurrence: isRecurring ? 'weekly' : null,
-      reward,
-      stars,
-      dueDate,
-      time,
-      dayOfWeek,
-      hasReminder,
-      reminderDateTime,
-      status: 'new',
-      completedBy: null,
-      completedDate: null,
-      createdBy: state.currentUser ? state.currentUser.id : null,
-      order: state.tasks.length
-    };
-
-    const historyId = `${state.groupId}-hist-${Date.now()}`;
-    const historyEntry = {
-      id: historyId,
-      groupId: state.groupId,
-      taskId: newTask.id,
-      title: newTask.title,
-      action: 'created',
-      reward: newTask.reward,
-      stars: newTask.stars,
-      completedBy: state.currentUser.id,
-      completedDate: formatDateString(new Date()),
-      timestamp: new Date().toISOString()
-    };
-    
-    if (state.groupId === 'local-sandbox') {
-      state.tasks.push(newTask);
-      state.history.push(historyEntry);
-      
-      // Email notification for Mom if task is assigned to her
-      const assignedUser = state.users.find(u => u.id === newTask.assignedTo);
-      if (assignedUser && (assignedUser.name === 'אמא' || assignedUser.id.endsWith('user-mom')) && assignedUser.email) {
-        try {
-          sendTaskCreatedEmail(newTask, assignedUser);
-        } catch (mailErr) {
-          console.error("Failed to send task creation email to Mom in local-sandbox:", mailErr);
-        }
-      }
-      
-      saveState();
-      const elCreateTaskOverlay = document.getElementById('create-task-overlay');
-      if (elCreateTaskOverlay) {
-        elCreateTaskOverlay.classList.remove('active');
-      }
-      localStorage.setItem('household_pending_toast', JSON.stringify({
-        message: `המשימה "${title}" נוצרה בהצלחה!`,
-        type: 'success'
-      }));
-      window.location.reload();
-      return;
-    }
-
-    try {
-      await db.collection('tasks').doc(newTask.id).set(newTask);
-      await db.collection('history').doc(historyId).set(historyEntry);
-      
-      // Email notification for Mom if task is assigned to her
-      const assignedUser = state.users.find(u => u.id === newTask.assignedTo);
-      if (assignedUser && (assignedUser.name === 'אמא' || assignedUser.id.endsWith('user-mom')) && assignedUser.email) {
-        try {
-          await sendTaskCreatedEmail(newTask, assignedUser);
-        } catch (mailErr) {
-          console.error("Failed to send task creation email to Mom:", mailErr);
-        }
-      }
-    } catch (err) {
-      console.error("Firebase save task failed:", err);
-    }
-    
-    saveState();
-    
-    const elCreateTaskOverlay = document.getElementById('create-task-overlay');
-    if (elCreateTaskOverlay) {
-      elCreateTaskOverlay.classList.remove('active');
-    }
-    
-    localStorage.setItem('household_pending_toast', JSON.stringify({
-      message: `המשימה "${title}" נוצרה בהצלחה!`,
-      type: 'success'
-    }));
-    window.location.reload();
-  });
-}
 
   // Profile Management - Add Profile
   if (elAdminAddProfileForm) {
@@ -2543,7 +3297,7 @@ function selectUser(userId) {
 function renderDashboard() {
   // Count stats
   const currentUserId = state.currentUser ? state.currentUser.id : '';
-  const myTasks = state.tasks.filter(t => t.status !== 'completed' && t.assignedTo === currentUserId && !isTaskCompletedToday(t));
+  const myTasks = state.tasks.filter(t => t.status !== 'completed' && t.assignedTo === currentUserId && !isTaskCompletedToday(t, currentUserId));
   const pendingCount = myTasks.length;
   
   // Total completions by current user
@@ -2690,14 +3444,7 @@ function formatDateHebrew(dateStr) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-// Populate admin options
-function populateAdminAssigneeSelect() {
-  elAdminAssignee.innerHTML = '<option value="" disabled selected>בחר בן משפחה...</option>';
-  elAdminAssignee.innerHTML += `<option value="all">👥 כל בני המשפחה</option>`;
-  state.users.forEach(u => {
-    elAdminAssignee.innerHTML += `<option value="${u.id}">${u.name} (${u.role === 'admin' ? 'הורה' : 'ילד'})</option>`;
-  });
-}
+
 
 function populateTaskAssigneeFilter() {
   if (!elTaskAssigneeFilter) return;
@@ -2790,17 +3537,17 @@ function renderTasks() {
     // Tasks assigned directly to current user or to 'all' (Everyone) that are active
     filteredTasks = state.tasks.filter(t => {
       const isAssignedToMe = t.assignedTo === (state.currentUser ? state.currentUser.id : '') || t.assignedTo === 'all';
-      return isAssignedToMe && t.status !== 'completed' && !isTaskCompletedToday(t);
+      return isAssignedToMe && t.status !== 'completed' && !isTaskCompletedToday(t, state.currentUser ? state.currentUser.id : '');
     });
   } else if (filter === 'paid') {
     // Show paid active tasks
-    filteredTasks = state.tasks.filter(t => t.status !== 'completed' && t.reward > 0 && !isTaskCompletedToday(t));
+    filteredTasks = state.tasks.filter(t => t.status !== 'completed' && t.reward > 0 && !isTaskCompletedToday(t, t.assignedTo));
   } else if (filter === 'completed') {
     // Show completed tasks (one-off completed permanently, or recurring completed today)
-    filteredTasks = state.tasks.filter(t => t.status === 'completed' || isTaskCompletedToday(t));
+    filteredTasks = state.tasks.filter(t => t.status === 'completed' || isTaskCompletedToday(t, state.currentUser ? state.currentUser.id : ''));
   } else {
     // 'all' active tasks (excluding completed ones)
-    filteredTasks = state.tasks.filter(t => t.status !== 'completed' && !isTaskCompletedToday(t));
+    filteredTasks = state.tasks.filter(t => t.status !== 'completed' && !isTaskCompletedToday(t, t.assignedTo));
   }
 
   // Apply assignee dropdown filter
@@ -2825,6 +3572,8 @@ function renderTasks() {
     }
     return;
   }
+
+  const fragment = document.createDocumentFragment();
 
   filteredTasks.forEach(task => {
     const card = document.createElement('div');
@@ -2875,6 +3624,8 @@ function renderTasks() {
     // Build actions based on user and task state
     let actionHTML = '';
     const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+    const isAssignee = state.currentUser && task.assignedTo === state.currentUser.id;
+    const canComplete = isAssignee || isAdmin;
     const canEdit = isAdmin || (state.currentUser && task.createdBy === state.currentUser.id);
 
     if (task.status !== 'completed') {
@@ -2882,9 +3633,13 @@ function renderTasks() {
         actionHTML += `
           <button class="btn btn-secondary" onclick="claimTask('${task.id}')" style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.2); color: #a78bfa; flex-grow: 1;">🙋 שייך אליי</button>
         `;
-      } else {
+      } else if (canComplete) {
         actionHTML += `
           <button class="btn btn-primary" onclick="triggerCompleteTask('${task.id}')" style="flex-grow: 1;">סמן כבוצע</button>
+        `;
+      } else {
+        actionHTML += `
+          <button class="btn btn-primary" style="flex-grow: 1; opacity: 0.5; cursor: not-allowed;" disabled title="משימה זו משויכת למישהו אחר">סמן כבוצע</button>
         `;
       }
 
@@ -2935,20 +3690,44 @@ function renderTasks() {
       if (task.dueDate) {
         scheduleHTML = `
           <div style="font-size: 0.8rem; color: #a78bfa; font-weight: 500; margin-bottom: 8px;">
-            📅 יעד: ${formatDateHebrew(task.dueDate)} בשעה ${task.time || '12:00'}
+            📅 יעד: ${formatDateHebrew(task.dueDate)}${task.time ? ` בשעה ${task.time}` : ''}
           </div>
         `;
       }
     } else {
       let scheduleText = '';
-      if (task.recurrence === 'daily') {
-        scheduleText = `🔄 מדי יום בשעה ${task.time || '09:00'}`;
+      if (task.isRecurring && task.recurringStartDate) {
+        const periodText = task.recurringFrequencyPeriod === 'day' ? 'יום' : (task.recurringFrequencyPeriod === 'week' ? 'שבוע' : 'חודש');
+        scheduleText = `${task.recurringFrequencyTimes || 1} פעמים ב${periodText}`;
+      } else if (task.recurrence === 'daily') {
+        scheduleText = `מדי יום`;
+      } else if (task.dayOfWeek !== null && task.dayOfWeek !== undefined) {
+        scheduleText = `יום ${HebrewWeekdays[task.dayOfWeek]}`;
       } else {
-        scheduleText = `🔄 יום ${HebrewWeekdays[task.dayOfWeek]} בשעה ${task.time || '09:00'}`;
+        scheduleText = `משימה מחזורית`;
       }
       scheduleHTML = `
         <div style="font-size: 0.8rem; color: #a78bfa; font-weight: 500; margin-bottom: 8px;">
-          ${scheduleText}
+          📅 יעד: מחזורי (${scheduleText})
+        </div>
+      `;
+    }
+
+    let sharedQueueHTML = '';
+    if (task.isShared && task.sharedQueue && task.sharedQueue.length > 0) {
+      const queueNames = task.sharedQueue.map((uid, index) => {
+        const u = state.users.find(usr => usr.id === uid);
+        const name = u ? u.name : 'משתמש';
+        const isActive = (index === task.sharedCurrentIndex);
+        return `<span style="padding: 2px 6px; border-radius: 4px; ${isActive ? 'background: rgba(139,92,246,0.25); color: #c084fc; font-weight: 700; border: 1px solid rgba(139,92,246,0.4);' : 'color: var(--text-muted); opacity: 0.7;'}">${index + 1}. ${name}</span>`;
+      }).join(' ➔ ');
+      
+      sharedQueueHTML = `
+        <div class="shared-queue-container" style="font-size: 0.8rem; margin-top: 4px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; direction: rtl; text-align: right; background: rgba(255,255,255,0.01); border: 1px dashed rgba(255,255,255,0.05); padding: 6px 10px; border-radius: 8px; width: 100%;">
+          <span style="font-weight: bold; color: var(--accent-purple);">👥 תור ביצוע:</span>
+          <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+            ${queueNames}
+          </div>
         </div>
       `;
     }
@@ -2963,6 +3742,7 @@ function renderTasks() {
       </div>
       <p class="task-desc">${task.description || 'אין פירוט נוסף.'}</p>
       ${scheduleHTML}
+      ${sharedQueueHTML}
       <div class="task-meta">
         <span class="task-assignee" style="background: ${assigneeColor === 'var(--text-muted)' ? 'rgba(255, 255, 255, 0.02)' : assigneeColor + '12'}; border: 1px solid ${assigneeColor === 'var(--text-muted)' ? 'rgba(255, 255, 255, 0.08)' : assigneeColor + '30'}; color: ${assigneeColor === 'var(--text-muted)' ? 'var(--text-secondary)' : assigneeColor}; padding: 4px 10px; border-radius: 20px; font-weight: 600; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px;">
           <span class="assignee-dot" style="background-color: ${assigneeColor === 'var(--text-muted)' ? 'var(--text-muted)' : assigneeColor}; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px ${assigneeColor === 'var(--text-muted)' ? 'transparent' : assigneeColor};"></span>
@@ -2977,10 +3757,12 @@ function renderTasks() {
       </div>
     `;
 
-    if (elTasksGrid) {
-      elTasksGrid.appendChild(card);
-    }
+    fragment.appendChild(card);
   });
+
+  if (elTasksGrid) {
+    elTasksGrid.appendChild(fragment);
+  }
 }
 
 // Expand/Collapse Calendar Menu dropdowns
@@ -3107,7 +3889,7 @@ async function sendTaskCreatedEmail(task, momUser) {
     action: 'email-sent',
     reward: 0,
     stars: 0,
-    completedBy: state.currentUser.id,
+    completedBy: state.currentUser ? state.currentUser.id : 'system',
     completedDate: todayStr,
     timestamp: new Date().toISOString()
   };
@@ -3198,10 +3980,17 @@ window.triggerCompleteTask = async function(taskId) {
   const taskIndex = state.tasks.findIndex(t => t.id === taskId);
   if (taskIndex === -1) return;
   
+  const task = state.tasks[taskIndex];
+  
+  const isAssignee = state.currentUser && task.assignedTo === state.currentUser.id;
+  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+  if (!isAssignee && !isAdmin) {
+    showToast('אינך רשאי לבצע משימה זו', 'error');
+    return;
+  }
+  
   // Play the task complete deep sound feedback
   playTaskCompleteSound();
-  
-  const task = state.tasks[taskIndex];
   
   // Find card element in DOM and show V pyrotechnics celebration
   const cardEl = document.getElementById(`task-card-${taskId}`);
@@ -3315,19 +4104,46 @@ window.triggerCompleteTask = async function(taskId) {
     }
   });
 
-  // Handle recurrence vs one-off
-  if (task.type === 'recurring') {
-    if (task.title.includes('הכלב') || task.title.includes('כלים') || task.title.includes('רכב')) {
-      const originalTask = window.householdMockData.tasks.find(t => t.title === task.title);
-      if (originalTask && originalTask.assignedTo === 'all') {
-        task.assignedTo = 'all';
+  // Handle shared task queue switching
+  if (task.isShared && task.sharedQueue && task.sharedQueue.length > 0) {
+    if (task.sharedCurrentIndex + 1 < task.sharedQueue.length) {
+      // Move to the next person in queue
+      task.sharedCurrentIndex += 1;
+      task.assignedTo = task.sharedQueue[task.sharedCurrentIndex];
+      task.status = 'new';
+      
+      const nextUser = state.users.find(u => u.id === task.assignedTo);
+      const nextUserName = nextUser ? nextUser.name : 'הבא בתור';
+      showToast(`התור הועבר בהצלחה ל${nextUserName}!`, 'info');
+    } else {
+      // Last person in queue has completed it
+      if (task.type === 'recurring') {
+        task.sharedCurrentIndex = 0;
+        task.assignedTo = task.sharedQueue[0];
+        task.status = 'new';
+        showToast(`המשימה המשותפת הושלמה על ידי כולם ותתחיל מחדש!`, 'success');
+      } else {
+        task.status = 'completed';
+        task.completedBy = state.currentUser.id;
+        task.completedDate = todayStr;
+        showToast(`המשימה המשותפת הושלמה בהצלחה על ידי כל חברי התור!`, 'success');
       }
     }
-    task.status = 'new';
   } else {
-    task.status = 'completed';
-    task.completedBy = state.currentUser.id;
-    task.completedDate = todayStr;
+    // Normal task completion
+    if (task.type === 'recurring') {
+      if (task.title.includes('הכלב') || task.title.includes('כלים') || task.title.includes('רכב')) {
+        const originalTask = window.householdMockData.tasks.find(t => t.title === task.title);
+        if (originalTask && originalTask.assignedTo === 'all') {
+          task.assignedTo = 'all';
+        }
+      }
+      task.status = 'new';
+    } else {
+      task.status = 'completed';
+      task.completedBy = state.currentUser.id;
+      task.completedDate = todayStr;
+    }
   }
 
   if (state.groupId === 'local-sandbox') {
@@ -3509,6 +4325,7 @@ function renderCalendar() {
 
   // Clear Grid
   elCalendarDaysGrid.innerHTML = '';
+  const fragment = document.createDocumentFragment();
 
   // Get first day of the month and count of days
   const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sun, 1 = Mon ...
@@ -3524,7 +4341,7 @@ function renderCalendar() {
     dayCell.className = 'calendar-day-cell inactive';
     const dayNum = prevMonthTotalDays - i;
     dayCell.innerHTML = `<span class="day-number">${dayNum}</span>`;
-    elCalendarDaysGrid.appendChild(dayCell);
+    fragment.appendChild(dayCell);
   }
 
   // Current month active cells
@@ -3557,6 +4374,34 @@ function renderCalendar() {
         }
         if (task.recurrence === 'weekly') {
           return task.dayOfWeek === dayOfWeek;
+        }
+        if (task.recurrence === 'custom' && task.recurringStartDate) {
+          const start = new Date(task.recurringStartDate + 'T00:00:00');
+          const cellDate = new Date(cellDateStr + 'T00:00:00');
+          if (cellDate < start) return false;
+          
+          if (task.recurringEndDate) {
+            const end = new Date(task.recurringEndDate + 'T00:00:00');
+            if (cellDate > end) return false;
+          }
+          
+          const times = task.recurringFrequencyTimes || 1;
+          const period = task.recurringFrequencyPeriod || 'day';
+          
+          if (period === 'day') {
+            const diffTime = cellDate.getTime() - start.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays % times === 0;
+          } else if (period === 'week') {
+            if (cellDate.getDay() !== start.getDay()) return false;
+            const diffTime = cellDate.getTime() - start.getTime();
+            const diffWeeks = Math.round(diffTime / (7 * 1000 * 60 * 60 * 24));
+            return diffWeeks % times === 0;
+          } else if (period === 'month') {
+            if (cellDate.getDate() !== start.getDate()) return false;
+            const diffMonths = (cellDate.getFullYear() - start.getFullYear()) * 12 + (cellDate.getMonth() - start.getMonth());
+            return diffMonths % times === 0;
+          }
         }
       }
       return false;
@@ -3592,7 +4437,7 @@ function renderCalendar() {
       openDayModal(cellDateStr, dayTasks);
     });
 
-    elCalendarDaysGrid.appendChild(dayCell);
+    fragment.appendChild(dayCell);
   }
 
   // Next month padding cells to complete a 6-row or 5-row grid nicely
@@ -3602,8 +4447,10 @@ function renderCalendar() {
     const dayCell = document.createElement('div');
     dayCell.className = 'calendar-day-cell inactive';
     dayCell.innerHTML = `<span class="day-number">${i}</span>`;
-    elCalendarDaysGrid.appendChild(dayCell);
+    fragment.appendChild(dayCell);
   }
+
+  elCalendarDaysGrid.appendChild(fragment);
 }
 
 // Calendar Day modal logic
@@ -3940,7 +4787,7 @@ function checkTaskReminders() {
   const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
   state.tasks.forEach(task => {
-    if (task.status === 'completed' || isTaskCompletedToday(task)) return;
+    if (task.status === 'completed' || isTaskCompletedToday(task, task.assignedTo)) return;
 
     let isMatch = false;
 
@@ -4063,7 +4910,7 @@ function checkDeadlineNotifications() {
   const now = Date.now();
   
   state.tasks.forEach(task => {
-    if (task.status === 'completed' || isTaskCompletedToday(task)) return;
+    if (task.status === 'completed' || isTaskCompletedToday(task, task.assignedTo)) return;
     if (!task.dueDate) return; // Only check tasks with a due date
     
     // Parse deadline
@@ -4277,7 +5124,9 @@ window.triggerEditTask = function(taskId) {
   document.getElementById('admin-edit-task-desc').value = task.description || '';
   
   if (document.getElementById('admin-edit-task-due-date')) {
-    document.getElementById('admin-edit-task-due-date').value = task.dueDate || '';
+    const elDate = document.getElementById('admin-edit-task-due-date');
+    elDate.value = task.dueDate || '';
+    elDate.dispatchEvent(new Event('change'));
   }
   
   const selectAssignee = document.getElementById('admin-edit-task-assignee');
@@ -4287,6 +5136,78 @@ window.triggerEditTask = function(taskId) {
     selectAssignee.innerHTML += `<option value="${u.id}">${u.name} (${u.role === 'admin' ? 'הורה' : 'ילד'})</option>`;
   });
   selectAssignee.value = task.assignedTo || '';
+
+  // Render Custom Assignee Selector Avatars
+  const renderEditCustomAssigneeSelector = () => {
+    const elEditCustomSelector = document.getElementById('admin-edit-task-assignee-custom-selector');
+    if (!elEditCustomSelector) return;
+    elEditCustomSelector.innerHTML = '';
+    
+    const currentVal = selectAssignee.value;
+    const isAllActive = currentVal === 'all';
+    
+    // Everyone Option
+    const allOption = document.createElement('div');
+    allOption.style.display = 'flex';
+    allOption.style.flexDirection = 'column';
+    allOption.style.alignItems = 'center';
+    allOption.style.cursor = 'pointer';
+    allOption.style.userSelect = 'none';
+    allOption.style.flexShrink = '0';
+    allOption.innerHTML = `
+      <div class="assignee-avatar-circle" style="position: relative; width: 62px; height: 62px; border-radius: 50%; border: 3px solid ${isAllActive ? '#8b5cf6' : 'rgba(255,255,255,0.08)'}; background: ${isAllActive ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255,255,255,0.02)'}; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; transition: var(--transition-smooth); box-shadow: ${isAllActive ? '0 0 10px rgba(139, 92, 246, 0.25)' : 'none'};">
+        👪
+        <div class="checkmark-badge" style="position: absolute; bottom: -2px; left: -2px; width: 22px; height: 22px; border-radius: 50%; background: #8b5cf6; border: 2.5px solid #1a0f30; display: ${isAllActive ? 'flex' : 'none'}; align-items: center; justify-content: center; color: white; font-size: 0.75rem; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">✓</div>
+      </div>
+      <span style="font-size: 0.85rem; font-weight: 700; color: ${isAllActive ? 'var(--text-primary)' : 'var(--text-secondary)'}; margin-top: 6px; text-align: center;">כולם</span>
+    `;
+    allOption.addEventListener('click', () => {
+      selectAssignee.value = 'all';
+      renderEditCustomAssigneeSelector();
+    });
+    elEditCustomSelector.appendChild(allOption);
+    
+    // Member Options
+    state.users.forEach(u => {
+      const isActive = currentVal === u.id;
+      const userOption = document.createElement('div');
+      userOption.style.display = 'flex';
+      userOption.style.flexDirection = 'column';
+      userOption.style.alignItems = 'center';
+      userOption.style.cursor = 'pointer';
+      userOption.style.userSelect = 'none';
+      userOption.style.flexShrink = '0';
+      const firstName = u.name.split(' ')[0];
+      userOption.innerHTML = `
+        <div class="assignee-avatar-circle" style="position: relative; width: 62px; height: 62px; border-radius: 50%; border: 3px solid ${isActive ? '#8b5cf6' : 'rgba(255,255,255,0.08)'}; background: ${isActive ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255,255,255,0.02)'}; display: flex; align-items: center; justify-content: center; overflow: visible; transition: var(--transition-smooth); box-shadow: ${isActive ? '0 0 10px rgba(139, 92, 246, 0.25)' : 'none'};">
+          <span style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; font-size: 1.8rem;">${getAvatarHTML(u.avatar)}</span>
+          <div class="checkmark-badge" style="position: absolute; bottom: -2px; left: -2px; width: 22px; height: 22px; border-radius: 50%; background: #8b5cf6; border: 2.5px solid #1a0f30; display: ${isActive ? 'flex' : 'none'}; align-items: center; justify-content: center; color: white; font-size: 0.75rem; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">✓</div>
+        </div>
+        <span style="font-size: 0.85rem; font-weight: 700; color: ${isActive ? 'var(--text-primary)' : 'var(--text-secondary)'}; margin-top: 6px; text-align: center;">${firstName}</span>
+      `;
+      userOption.addEventListener('click', () => {
+        selectAssignee.value = u.id;
+        renderEditCustomAssigneeSelector();
+      });
+      elEditCustomSelector.appendChild(userOption);
+    });
+
+    setTimeout(() => {
+      updateCustomAssigneeScrollIndicator('admin-edit-task-assignee-custom-selector', 'edit-assignee-scroll-indicator');
+    }, 50);
+  };
+  renderEditCustomAssigneeSelector();
+
+  const elEditCustomSelector = document.getElementById('admin-edit-task-assignee-custom-selector');
+  if (elEditCustomSelector) {
+    elEditCustomSelector.addEventListener('scroll', () => {
+      updateCustomAssigneeScrollIndicator('admin-edit-task-assignee-custom-selector', 'edit-assignee-scroll-indicator');
+    });
+  }
+
+  // Reset expandable settings collapsed by default
+  document.getElementById('edit-task-expanded-content').style.display = 'none';
+  document.getElementById('edit-expand-arrow').style.transform = 'rotate(0deg)';
 
   document.getElementById('admin-edit-task-status').value = task.status;
 
@@ -4330,6 +5251,22 @@ window.triggerEditTask = function(taskId) {
     document.getElementById('admin-edit-task-reminder-minute').value = '00';
   }
 
+  const isShared = !!task.isShared;
+  const elEditIsShared = document.getElementById('admin-edit-task-is-shared');
+  const elEditMultiAssigneeGroup = document.getElementById('edit-multi-assignee-group');
+  if (elEditIsShared) elEditIsShared.checked = isShared;
+  if (elEditMultiAssigneeGroup) elEditMultiAssigneeGroup.style.display = isShared ? 'block' : 'none';
+  
+  const editAssigneeGroup = selectAssignee ? selectAssignee.closest('.form-group') : null;
+  if (editAssigneeGroup) {
+    editAssigneeGroup.style.display = isShared ? 'none' : 'block';
+  }
+  
+  window.editSelectedSharedQueue = task.sharedQueue || [];
+  if (isShared) {
+    window.renderEditMultiAssigneeList();
+  }
+
   const deleteBtn = document.getElementById('admin-edit-task-delete-btn');
   if (deleteBtn) {
     if (isParent || isCreator) {
@@ -4340,6 +5277,9 @@ window.triggerEditTask = function(taskId) {
   }
 
   elEditTaskOverlay.classList.add('active');
+  setTimeout(() => {
+    updateCustomAssigneeScrollIndicator('admin-edit-task-assignee-custom-selector', 'edit-assignee-scroll-indicator');
+  }, 350);
 };
 
 async function saveTaskEdit(e) {
@@ -4349,10 +5289,19 @@ async function saveTaskEdit(e) {
   const description = document.getElementById('admin-edit-task-desc').value.trim();
   const assignedTo = document.getElementById('admin-edit-task-assignee').value;
 
-  if (!assignedTo) {
+  const isShared = document.getElementById('admin-edit-task-is-shared').checked;
+  const sharedQueue = isShared ? window.editSelectedSharedQueue : [];
+  
+  if (!isShared && !assignedTo) {
     showToast('נא לבחור בן משפחה לביצוע המשימה', 'warning');
     return;
   }
+  
+  if (isShared && sharedQueue.length === 0) {
+    showToast('נא לבחור לפחות בן משפחה אחד למשימה המשותפת', 'warning');
+    return;
+  }
+
   const status = document.getElementById('admin-edit-task-status').value;
   const paymentType = document.getElementById('admin-edit-task-payment-type').value;
   const rewardInput = document.getElementById('admin-edit-task-reward').value;
@@ -4405,7 +5354,12 @@ async function saveTaskEdit(e) {
     
     task.title = title;
     task.description = description;
-    task.assignedTo = assignedTo;
+    
+    task.isShared = isShared;
+    task.sharedQueue = sharedQueue;
+    task.sharedCurrentIndex = task.sharedCurrentIndex >= sharedQueue.length ? 0 : task.sharedCurrentIndex;
+    task.assignedTo = isShared ? (sharedQueue[task.sharedCurrentIndex] || '') : assignedTo;
+    
     task.type = isRecurring ? 'recurring' : 'one-off';
     task.recurrence = isRecurring ? 'weekly' : null;
     task.reward = reward;
