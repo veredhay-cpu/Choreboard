@@ -464,30 +464,46 @@ function updateGroupNameUI() {
   const elFamilySelect = document.getElementById('header-family-select');
   
   if (elFamilyName && elFamilySelect) {
-    if (groups.length > 1) {
-      elFamilyName.style.display = 'none';
-      elFamilySelect.style.display = 'inline-block';
-      
-      const currentOptions = Array.from(elFamilySelect.options).map(o => o.value).join(',');
-      const newOptions = groups.map(g => g.id).join(',');
-      
-      if (currentOptions !== newOptions) {
-        elFamilySelect.innerHTML = '';
-        groups.forEach(g => {
-          const opt = document.createElement('option');
-          opt.value = g.id;
-          opt.textContent = g.name || g.id;
-          opt.selected = (g.id === state.groupId);
-          elFamilySelect.appendChild(opt);
-        });
-      } else {
-        elFamilySelect.value = state.groupId;
-      }
-    } else {
-      elFamilyName.style.display = 'inline';
-      elFamilySelect.style.display = 'none';
-      elFamilyName.textContent = state.groupName || 'המשפחה שלי';
+    elFamilyName.style.display = 'none';
+    elFamilySelect.style.display = 'inline-block';
+    
+    // Always rebuild to keep active selection and actions in sync
+    elFamilySelect.innerHTML = '';
+    
+    // Add all connected groups
+    groups.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.id;
+      opt.textContent = g.name || g.id;
+      opt.selected = (g.id === state.groupId);
+      elFamilySelect.appendChild(opt);
+    });
+    
+    // Add active sandbox option if they are in sandbox and it's not in connected groups
+    if (state.groupId === 'local-sandbox' && !groups.some(g => g.id === 'local-sandbox')) {
+      const optSandbox = document.createElement('option');
+      optSandbox.value = 'local-sandbox';
+      optSandbox.textContent = '🏠 מצב מקומי (Sandbox)';
+      optSandbox.selected = true;
+      elFamilySelect.appendChild(optSandbox);
     }
+    
+    // Add separator
+    const optDivider = document.createElement('option');
+    optDivider.disabled = true;
+    optDivider.textContent = '──────────';
+    elFamilySelect.appendChild(optDivider);
+    
+    // Add action options
+    const optCreate = document.createElement('option');
+    optCreate.value = '_action_create';
+    optCreate.textContent = '➕ הקמת קבוצה חדשה...';
+    elFamilySelect.appendChild(optCreate);
+    
+    const optJoin = document.createElement('option');
+    optJoin.value = '_action_join';
+    optJoin.textContent = '🔑 התחברות לקבוצה...';
+    elFamilySelect.appendChild(optJoin);
   }
 
   const elSubtitle = document.querySelector('.logo-section p');
@@ -499,21 +515,13 @@ function updateGroupNameUI() {
     elNicknameInput.value = state.groupName;
   }
 
-  // Toggle header group badge and create group button
-  const elGroupBadge = document.getElementById('header-group-badge');
+  // Toggle create group button
   const elCreateBtn = document.getElementById('header-create-group-btn');
   if (state.groupId && state.groupId !== 'local-sandbox') {
-    if (elGroupBadge) {
-      elGroupBadge.textContent = state.groupName || 'קבוצה פעילה';
-      elGroupBadge.style.display = 'inline-block';
-    }
     if (elCreateBtn) {
       elCreateBtn.style.display = 'none';
     }
   } else {
-    if (elGroupBadge) {
-      elGroupBadge.style.display = 'none';
-    }
     if (elCreateBtn) {
       elCreateBtn.style.display = 'none';
     }
@@ -684,7 +692,7 @@ function loadFallbackLocalData() {
   showToast("המערכת פועלת במצב מקומי (Offline Fallback) עקב שגיאת התחברות ל-Firebase", "warning");
 }
 
-const CURRENT_VERSION = '1.13.3';
+const CURRENT_VERSION = '1.14.7';
 
 async function checkVersionAndBustCache() {
   try {
@@ -1216,8 +1224,9 @@ function initFastCreateTaskModal() {
     
     elOverlay.classList.add('active');
     setTimeout(() => {
+      if (elTitle) elTitle.focus();
       updateCustomAssigneeScrollIndicator('fast-task-assignee-custom-selector', 'fast-assignee-scroll-indicator');
-    }, 350);
+    }, 150);
   });
 
   // Close modal trigger
@@ -1942,7 +1951,7 @@ async function initApp() {
     bindEvents();
     
     // Bind Welcome Overlay specific actions
-    initWelcomeOverlayEvents();
+
     
     // Bind group setup handlers for banner/settings
     initGroupSetupHandlers();
@@ -2543,6 +2552,17 @@ function switchTab(targetTab) {
 
   localStorage.setItem('household_active_tab', targetTab);
 
+  // Update navigation drawer item active class
+  const drawerItems = document.querySelectorAll('.drawer-item');
+  drawerItems.forEach(item => {
+    const tab = item.getAttribute('data-tab');
+    if (tab === targetTab) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+  });
+
   // Special re-render triggers
   if (targetTab === 'calendar') {
     renderCalendar();
@@ -2558,10 +2578,43 @@ function bindEvents() {
   const elFamilySelect = document.getElementById('header-family-select');
   if (elFamilySelect) {
     elFamilySelect.addEventListener('change', (e) => {
-      if (!e.isTrusted) return; // Prevent loop caused by programmatic option rebuilding
-      const targetGroupId = e.target.value;
-      if (targetGroupId && targetGroupId !== state.groupId) {
-        localStorage.setItem('household_group_id', targetGroupId);
+      const val = e.target.value;
+      if (val === '_action_create') {
+        elFamilySelect.value = state.groupId;
+        const welcomeOverlay = document.getElementById('welcome-overlay');
+        if (welcomeOverlay) {
+          welcomeOverlay.classList.add('active');
+          const elMainOptions = document.getElementById('welcome-main-options');
+          const elCreateForm = document.getElementById('welcome-create-form');
+          const elCodeForm = document.getElementById('welcome-code-form');
+          if (elMainOptions) elMainOptions.style.display = 'none';
+          if (elCreateForm) elCreateForm.style.display = 'flex';
+          if (elCodeForm) elCodeForm.style.display = 'none';
+          const elCreateInput = document.getElementById('welcome-group-name-input');
+          if (elCreateInput) {
+            elCreateInput.value = '';
+            elCreateInput.focus();
+          }
+        }
+      } else if (val === '_action_join') {
+        elFamilySelect.value = state.groupId;
+        const welcomeOverlay = document.getElementById('welcome-overlay');
+        if (welcomeOverlay) {
+          welcomeOverlay.classList.add('active');
+          const elMainOptions = document.getElementById('welcome-main-options');
+          const elCreateForm = document.getElementById('welcome-create-form');
+          const elCodeForm = document.getElementById('welcome-code-form');
+          if (elMainOptions) elMainOptions.style.display = 'none';
+          if (elCreateForm) elCreateForm.style.display = 'none';
+          if (elCodeForm) elCodeForm.style.display = 'flex';
+          const elCodeInput = document.getElementById('welcome-family-code-input');
+          if (elCodeInput) {
+            elCodeInput.value = '';
+            elCodeInput.focus();
+          }
+        }
+      } else if (val && val !== state.groupId) {
+        localStorage.setItem('household_group_id', val);
         localStorage.removeItem('household_current_user');
         localStorage.removeItem('household_user_profile');
         window.location.reload();
@@ -3198,6 +3251,69 @@ function bindEvents() {
   if (elBtnDashboardBackToHome) {
     elBtnDashboardBackToHome.addEventListener('click', () => {
       switchTab('home');
+    });
+  }
+
+  // Ensure welcome overlay event handlers are always bound
+  initWelcomeOverlayEvents();
+
+  // Close all user picker dropdown menus on click outside
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.user-context-dropdown').forEach(d => {
+      d.style.display = 'none';
+    });
+  });
+
+  // Header settings gear button
+  const elHeaderSettingsBtn = document.getElementById('header-settings-btn');
+  if (elHeaderSettingsBtn && elFamilySettingsOverlay) {
+    elHeaderSettingsBtn.addEventListener('click', () => {
+      elFamilySettingsOverlay.classList.add('active');
+      renderProfilesList();
+    });
+  }
+
+  // Hamburger Menu and Navigation Drawer
+  const elHamburgerBtn = document.getElementById('hamburger-menu-btn');
+  const elNavDrawer = document.getElementById('navigation-drawer');
+  const elDrawerOverlay = document.getElementById('drawer-overlay');
+  const elDrawerCloseBtn = document.getElementById('drawer-close-btn');
+
+  if (elHamburgerBtn && elNavDrawer && elDrawerOverlay) {
+    const toggleDrawer = () => {
+      elHamburgerBtn.classList.toggle('open');
+      elNavDrawer.classList.toggle('open');
+      elDrawerOverlay.classList.toggle('active');
+    };
+
+    elHamburgerBtn.addEventListener('click', toggleDrawer);
+    if (elDrawerCloseBtn) elDrawerCloseBtn.addEventListener('click', toggleDrawer);
+    elDrawerOverlay.addEventListener('click', toggleDrawer);
+
+    // Bind drawer item links
+    const drawerItems = document.querySelectorAll('.drawer-item');
+    drawerItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const tab = item.getAttribute('data-tab');
+        if (tab) {
+          switchTab(tab);
+          toggleDrawer();
+        } else if (item.id === 'drawer-item-settings') {
+          toggleDrawer();
+          if (elFamilySettingsOverlay) {
+            elFamilySettingsOverlay.classList.add('active');
+            renderProfilesList();
+          }
+        } else if (item.id === 'drawer-item-inbox') {
+          toggleDrawer();
+          switchTab('inbox');
+        } else if (item.id === 'drawer-item-add-task') {
+          toggleDrawer();
+          const elAddTaskBtn = document.getElementById('menu-card-add-task');
+          if (elAddTaskBtn) elAddTaskBtn.click();
+        }
+      });
     });
   }
 }
@@ -4542,58 +4658,92 @@ function renderProfilesList() {
   state.users.forEach(user => {
     const item = document.createElement('div');
     item.className = 'admin-user-item';
-    item.style.padding = '12px 16px';
+    item.style.padding = '16px';
+    item.style.display = 'flex';
+    item.style.flexDirection = 'column';
+    item.style.gap = '12px';
     
     const isSelf = state.currentUser && user.id === state.currentUser.id;
+    const canModify = isAdmin || isSelf;
     
-    // Determine action buttons based on user permissions
-    let actionsHTML = '';
-    if (isAdmin) {
-      actionsHTML = `
-        <button type="button" class="btn btn-secondary btn-edit-profile" style="padding: 6px 12px; font-size: 0.75rem;">✏️ ערוך</button>
-        <button type="button" class="btn btn-primary btn-delete-profile" style="padding: 6px 12px; font-size: 0.75rem; background: var(--accent-pink);" ${isSelf ? 'disabled title="אינך יכול למחוק את עצמך"' : ''}>🗑️ מחק</button>
-      `;
-    } else if (isSelf) {
-      actionsHTML = `
-        <button type="button" class="btn btn-secondary btn-edit-profile" style="padding: 6px 12px; font-size: 0.75rem;">✏️ ערוך</button>
-      `;
-    }
-
-    let inviteButtonsHTML = '';
-    if (!isSelf) {
-      inviteButtonsHTML = `
-        <button type="button" class="btn btn-share-wa" title="הזמן בוואטסאפ">💬 הזמן</button>
-        <button type="button" class="btn btn-share-mail" title="הזמן במייל">✉️ הזמן</button>
-      `;
-    }
-
     item.innerHTML = `
-      <div class="admin-user-details">
-        <span style="font-size: 1.6rem; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); box-shadow: inset 0 0 10px ${user.color}30; overflow: hidden;">${getAvatarHTML(user.avatar)}</span>
-        <div class="admin-user-balance-info">
-          <span style="font-weight: 700;">${user.name} ${isSelf ? '<span style="font-size: 0.75rem; color: #a78bfa; font-weight: 500;">(אני)</span>' : ''}</span>
-          <span style="font-size: 0.75rem; color: var(--text-secondary);">${user.role === 'admin' ? 'הורה (מנהל)' : 'ילד / משתתף'}</span>
-          ${user.email ? `<span class="profile-detail-email">✉️ ${user.email}</span>` : ''}
-          ${user.phone ? `<span class="profile-detail-phone">📱 ${user.phone}</span>` : ''}
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 12px;">
+        <div class="admin-user-details" style="display: flex; align-items: center; gap: 12px; flex: 1;">
+          <span style="font-size: 1.6rem; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); overflow: hidden;">${getAvatarHTML(user.avatar)}</span>
+          <div class="admin-user-balance-info" style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span style="font-weight: 700; font-size: 1rem;">${user.name}</span>
+              ${isSelf ? '<span style="font-size: 0.75rem; color: #a78bfa; font-weight: 500;">(אני)</span>' : ''}
+              <span class="user-role-badge ${user.role}" style="font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; font-weight: 600; background: ${user.role === 'admin' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(245, 158, 11, 0.12)'}; color: ${user.role === 'admin' ? 'var(--accent-purple)' : '#f59e0b'};">${user.role === 'admin' ? 'מנהל' : 'משתתף'}</span>
+            </div>
+            ${user.email || user.phone ? `
+              <div style="font-size: 0.8rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 2px;">
+                ${user.email ? `<span style="display: flex; align-items: center; gap: 4px;">✉️ ${user.email}</span>` : ''}
+                ${user.phone ? `<span style="display: flex; align-items: center; gap: 4px;">📱 ${user.phone}</span>` : ''}
+              </div>
+            ` : ''}
+          </div>
         </div>
+        
+        <!-- Context Menu Button (3 dots) -->
+        ${canModify ? `
+          <div class="user-context-menu-container" style="position: relative; flex-shrink: 0;">
+            <button type="button" class="btn-context-trigger" style="background: none; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: 50%; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; transition: var(--transition-smooth);">⋮</button>
+            <div class="user-context-dropdown glass-panel" style="display: none;">
+              <button type="button" class="dropdown-item btn-edit-profile"><span>✏️</span> ערוך</button>
+              <button type="button" class="dropdown-item btn-delete-profile" ${isSelf ? 'disabled style="opacity: 0.5; cursor: not-allowed;" title="אינך יכול למחוק את עצמך"' : ''}><span>🗑️</span> הסר מהקבוצה</button>
+            </div>
+          </div>
+        ` : ''}
       </div>
-      <div class="admin-user-actions">
-        ${inviteButtonsHTML}
-        ${actionsHTML}
-      </div>
+      
+      <!-- Invite Buttons Row (WA / Mail) if not self -->
+      ${!isSelf ? `
+        <div class="admin-user-invite-row" style="display: flex; gap: 8px; width: 100%; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 4px;">
+          <button type="button" class="btn btn-share-wa btn-secondary" style="flex: 1; padding: 10px; font-size: 0.9rem; font-weight: 400 !important; border-radius: var(--border-radius-md); display: flex; align-items: center; justify-content: center; gap: 8px; background: transparent; border: 1.5px solid #10b981; color: #047857; cursor: pointer; transition: var(--transition-smooth); font-family: inherit;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.907h.004c4.368 0 7.926-3.558 7.93-7.93a7.9 7.9 0 0 0-2.327-5.615zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.69-4.98c-.202-.1-1.195-.59-1.381-.658-.186-.069-.322-.103-.457.1-.136.2-.524.658-.642.793-.119.135-.238.152-.44.05-.202-.1-.853-.314-1.624-1.002-.6-.535-1.005-1.197-1.123-1.397-.12-.2-.013-.309.088-.41.09-.09.202-.238.303-.356.101-.119.136-.2.203-.334.067-.134.034-.251-.017-.352-.05-.1-.457-1.1-.626-1.507-.164-.397-.33-.343-.457-.35-.126-.007-.27-.007-.413-.007s-.375.053-.571.268c-.196.216-.749.733-.749 1.787s.766 2.072.87 2.213c.105.14 1.505 2.304 3.64 3.226.508.219.904.35 1.215.449.51.161.974.138 1.34.084.407-.061 1.195-.489 1.362-.958.167-.47.167-.872.118-.957-.05-.084-.186-.134-.388-.234"/></svg>
+            <span>וואטסאפ</span>
+          </button>
+          <button type="button" class="btn btn-share-mail btn-secondary" style="flex: 1; padding: 10px; font-size: 0.9rem; font-weight: 400 !important; border-radius: var(--border-radius-md); display: flex; align-items: center; justify-content: center; gap: 8px; background: transparent; border: 1.5px solid #3b82f6; color: #1d4ed8; cursor: pointer; transition: var(--transition-smooth); font-family: inherit;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741zM1 11.105l4.708-2.897L1 5.383z"/></svg>
+            <span>מייל</span>
+          </button>
+        </div>
+      ` : ''}
     `;
     
+    // Wire context menu triggers
+    const trigger = item.querySelector('.btn-context-trigger');
+    const dropdown = item.querySelector('.user-context-dropdown');
+    if (trigger && dropdown) {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        
+        // Hide all other dropdowns first
+        document.querySelectorAll('.user-context-dropdown').forEach(d => {
+          if (d !== dropdown) d.style.display = 'none';
+        });
+        
+        const isShown = dropdown.style.display === 'block';
+        dropdown.style.display = isShown ? 'none' : 'block';
+      });
+    }
+
     // Add Event Listeners dynamically if elements exist
     const editBtn = item.querySelector('.btn-edit-profile');
     if (editBtn) {
-      editBtn.addEventListener('click', () => {
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (dropdown) dropdown.style.display = 'none';
         triggerEditProfile(user.id);
       });
     }
     
     const deleteBtn = item.querySelector('.btn-delete-profile');
     if (deleteBtn && !isSelf) {
-      deleteBtn.addEventListener('click', () => {
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (dropdown) dropdown.style.display = 'none';
         triggerDeleteProfile(user.id);
       });
     }
@@ -5357,7 +5507,7 @@ async function saveTaskEdit(e) {
     
     task.isShared = isShared;
     task.sharedQueue = sharedQueue;
-    task.sharedCurrentIndex = task.sharedCurrentIndex >= sharedQueue.length ? 0 : task.sharedCurrentIndex;
+    task.sharedCurrentIndex = (task.sharedCurrentIndex >= 0 && task.sharedCurrentIndex < sharedQueue.length) ? task.sharedCurrentIndex : 0;
     task.assignedTo = isShared ? (sharedQueue[task.sharedCurrentIndex] || '') : assignedTo;
     
     task.type = isRecurring ? 'recurring' : 'one-off';
@@ -6031,12 +6181,12 @@ function initGroupSetupHandlers() {
 async function migrateLocalDataToGroup(targetGroupId, isNewGroup, groupName) {
   if (!db) {
     showToast('אין חיבור למסד הנתונים של Firebase. העברת נתונים לענן אינה זמינה כעת.', 'warning');
-    return;
+    return false;
   }
   const localProfileStr = localStorage.getItem('household_user_profile');
   if (!localProfileStr) {
     showToast('שגיאה: לא נמצא פרופיל מקומי להעברה', 'warning');
-    return;
+    return false;
   }
   const localProfile = JSON.parse(localProfileStr);
 
@@ -6142,9 +6292,11 @@ async function migrateLocalDataToGroup(targetGroupId, isNewGroup, groupName) {
     localStorage.setItem('household_family_settings_open', 'true');
 
     window.location.reload();
+    return true;
   } catch (err) {
     console.error("Migration to group failed:", err);
     showToast('שגיאה בסנכרון הנתונים לענן. אנא נסה שנית.', 'warning');
+    throw err;
   }
 }
 
@@ -6161,28 +6313,63 @@ function initWelcomeOverlayEvents() {
   const elCodeBack = document.getElementById('welcome-code-back-btn');
   const elCodeError = document.getElementById('welcome-code-error');
   
+  const elCreateForm = document.getElementById('welcome-create-form');
+  const elCreateInput = document.getElementById('welcome-group-name-input');
+  const elCreateSubmit = document.getElementById('welcome-create-submit-btn');
+  const elCreateBack = document.getElementById('welcome-create-back-btn');
+  const elCreateError = document.getElementById('welcome-create-error');
+
   if (elCreateBtn) {
     elCreateBtn.addEventListener('click', () => {
-      // 1. Confirm visit
-      localStorage.setItem('household_visited', 'true');
-      
-      // 2. Hide welcome overlay
-      if (elWelcomeOverlay) elWelcomeOverlay.classList.remove('active');
-      
-      // 3. Open Family Settings modal
-      const elFamilySettingsOverlay = document.getElementById('family-settings-overlay');
-      if (elFamilySettingsOverlay) {
-        elFamilySettingsOverlay.classList.add('active');
-        renderProfilesList();
+      if (elMainOptions) elMainOptions.style.display = 'none';
+      if (elCreateForm) elCreateForm.style.display = 'flex';
+      if (elCreateInput) {
+        elCreateInput.value = '';
+        elCreateInput.focus();
       }
+      if (elCreateError) elCreateError.style.display = 'none';
+    });
+  }
+
+  if (elCreateBack) {
+    elCreateBack.addEventListener('click', () => {
+      if (elMainOptions) elMainOptions.style.display = 'flex';
+      if (elCreateForm) elCreateForm.style.display = 'none';
+    });
+  }
+
+  if (elCreateSubmit) {
+    elCreateSubmit.addEventListener('click', async () => {
+      if (!elCreateInput) return;
+      const groupName = elCreateInput.value.trim() || 'המשפחה שלי';
       
-      // 4. Focus and select nickname input field
-      const elFamilyNicknameInput = document.getElementById('admin-family-nickname-input');
-      if (elFamilyNicknameInput) {
-        setTimeout(() => {
-          elFamilyNicknameInput.focus();
-          elFamilyNicknameInput.select();
-        }, 300);
+      const originalText = elCreateSubmit.innerHTML;
+      elCreateSubmit.disabled = true;
+      elCreateSubmit.innerHTML = 'מקים קבוצה... ⏳';
+      if (elCreateError) elCreateError.style.display = 'none';
+
+      try {
+        const randomCode = `family-${Math.floor(10000 + Math.random() * 90000)}`;
+        const success = await migrateLocalDataToGroup(randomCode, true, groupName);
+        if (success) {
+          localStorage.setItem('household_visited', 'true');
+          if (elWelcomeOverlay) elWelcomeOverlay.classList.remove('active');
+        } else {
+          if (elCreateError) {
+            elCreateError.textContent = 'שגיאה: אין חיבור לשרת Firebase או שחסרים נתונים מקומיים.';
+            elCreateError.style.display = 'block';
+          }
+          elCreateSubmit.disabled = false;
+          elCreateSubmit.innerHTML = originalText;
+        }
+      } catch (err) {
+        console.error("Create family failed:", err);
+        if (elCreateError) {
+          elCreateError.textContent = 'שגיאה בהקמת קבוצה: ' + err.message;
+          elCreateError.style.display = 'block';
+        }
+        elCreateSubmit.disabled = false;
+        elCreateSubmit.innerHTML = originalText;
       }
     });
   }
@@ -6191,6 +6378,7 @@ function initWelcomeOverlayEvents() {
     elJoinBtn.addEventListener('click', () => {
       if (elMainOptions) elMainOptions.style.display = 'none';
       if (elCodeForm) elCodeForm.style.display = 'flex';
+      if (elCreateForm) elCreateForm.style.display = 'none';
       if (elCodeInput) {
         elCodeInput.value = '';
         elCodeInput.focus();

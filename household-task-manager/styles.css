@@ -132,7 +132,7 @@ header {
 }
 
 .logo-section h1 {
-  font-size: 1.8rem;
+  font-size: 1.35rem;
   font-weight: 800;
   background: linear-gradient(135deg, var(--accent-purple) 0%, var(--btn-primary-hover-bg) 100%);
   -webkit-background-clip: text;
@@ -1935,12 +1935,18 @@ body.mode-light {
 
 /* Light mode specific component overrides */
 body.mode-light .menu-card {
-  background: rgba(255, 255, 255, 0.8) !important;
+  background: rgba(241, 245, 249, 0.9) !important; /* darker/greyer background in light mode */
+  border-color: rgba(15, 23, 42, 0.1) !important;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
 }
 
 body.mode-light .menu-card-add-task {
-  background: linear-gradient(135deg, var(--accent-purple-glow) 0%, rgba(255, 255, 255, 0.9) 100%) !important;
+  background: rgba(255, 255, 255, 0.4) !important; /* very light, almost white/transparent */
+  border: 1px dashed rgba(0, 0, 0, 0.15) !important;
+}
+
+body.mode-light .menu-card-add-task h3 {
+  color: var(--text-secondary) !important;
 }
 
 body.mode-light .form-control,
@@ -2657,8 +2663,8 @@ body.mode-dark #task-assignee-filter option {
   cursor: pointer;
   padding: 22px 20px;
   border-radius: var(--border-radius-md);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.4); /* darker, more solid base */
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: var(--transition-smooth);
   display: flex;
   align-items: center;
@@ -2696,13 +2702,13 @@ body.mode-dark #task-assignee-filter option {
 }
 
 .menu-card-add-task {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(124, 58, 237, 0.02) 100%);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(255, 255, 255, 0.01) !important; /* very faint, light/transparent */
+  border: 1px dashed rgba(255, 255, 255, 0.1) !important;
 }
 
 .menu-card-add-task:hover {
-  border-color: var(--accent-purple) !important;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(124, 58, 237, 0.04) 100%) !important;
+  border-color: rgba(139, 92, 246, 0.4) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
 }
 
 .menu-card-icon {
@@ -3026,4 +3032,371 @@ body.mode-kids .user-picker-modal h3 {
   background: var(--accent-purple);
   border-color: var(--accent-purple);
   color: white;
+}
+
+/* Ensure select option dropdowns have visible text on all browsers and devices */
+select option {
+  background-color: #1a0f30 !important; /* Dark theme option background */
+  color: #ffffff !important;           /* White option text */
+}
+
+body.mode-light select option {
+  background-color: #ffffff !important; /* Light theme option background */
+  color: #0f172a !important;           /* Dark option text */
+}
+
+/* Header Action Settings Gear Button */
+.header-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: var(--accent-purple) !important;
+  transform: rotate(45deg);
+}
+
+body.mode-light .header-settings-btn {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+body.mode-light .header-settings-btn:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border-color: var(--accent-purple) !important;
+}
+
+/* Hamburger Menu Button */
+.hamburger-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  z-index: 990;
+  transition: var(--transition-smooth);
+}
+
+.hamburger-btn .bar1, 
+.hamburger-btn .bar2, 
+.hamburger-btn .bar3 {
+  width: 24px;
+  height: 3px;
+  background-color: var(--text-primary);
+  border-radius: 2px;
+  transition: 0.4s ease;
+}
+
+.hamburger-btn.open .bar1 {
+  transform: translateY(8px) rotate(-45deg);
+}
+
+.hamburger-btn.open .bar2 {
+  opacity: 0;
+}
+
+.hamburger-btn.open .bar3 {
+  transform: translateY(-8px) rotate(45deg);
+}
+
+/* Sliding Navigation Drawer */
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  right: -300px; /* Start hidden on the right (RTL) */
+  width: 280px;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-color);
+  direction: rtl;
+}
+
+body.mode-light .nav-drawer {
+  background: rgba(255, 255, 255, 0.95);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.1);
+}
+
+.nav-drawer.open {
+  right: 0;
+}
+
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.drawer-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+body.mode-light .drawer-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.drawer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 12px;
+  overflow-y: auto;
+}
+
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-radius: var(--border-radius-sm);
+  transition: var(--transition-smooth);
+}
+
+.drawer-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+body.mode-light .drawer-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.drawer-item.active {
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--accent-purple);
+  border-right: 4px solid var(--accent-purple);
+}
+
+body.mode-light .drawer-item.active {
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.drawer-badge {
+  background-color: #ef4444;
+  color: white;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-right: auto;
+}
+
+/* Emphasize and Style Task Title Field */
+#fast-task-title {
+  border: 2px solid rgba(255, 255, 255, 0.22) !important;
+  font-weight: 400 !important;
+  font-size: 1.05rem !important;
+  background: rgba(0, 0, 0, 0.25) !important;
+  transition: var(--transition-smooth) !important;
+}
+
+body.mode-light #fast-task-title {
+  border: 2px solid rgba(15, 23, 42, 0.25) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #0f172a !important;
+}
+
+#fast-task-title:focus {
+  border-color: var(--accent-purple) !important;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.45) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+body.mode-light #fast-task-title:focus {
+  background: #ffffff !important;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.25) !important;
+  border-color: var(--accent-purple) !important;
+}
+
+/* Desktop Header Grid Layout */
+@media (min-width: 769px) {
+  header {
+    display: grid !important;
+    grid-template-areas:
+      "hamburger logo . left-actions"
+      "group-selector group-selector right-profile left-profile" !important;
+    grid-template-columns: auto auto 1fr auto !important;
+    align-items: center !important;
+    gap: 16px !important;
+    padding: 16px 24px !important;
+  }
+  
+  .hamburger-btn {
+    grid-area: hamburger !important;
+    justify-self: start !important;
+  }
+  .header-logo {
+    grid-area: logo !important;
+    justify-self: start !important;
+    margin: 0 !important;
+  }
+  .family-selector-container {
+    grid-area: group-selector !important;
+    justify-self: start !important;
+    width: auto !important;
+    justify-content: flex-start !important;
+  }
+  #header-inbox-btn {
+    grid-area: left-actions !important;
+    justify-self: end !important;
+    display: flex !important;
+  }
+  #active-profile-card {
+    grid-area: right-profile !important;
+    justify-self: end !important;
+    margin: 0 !important;
+  }
+  .header-settings-btn {
+    grid-area: left-profile !important;
+    justify-self: end !important;
+    margin: 0 !important;
+  }
+}
+
+/* Mobile Header Layout (max-width: 768px) Override */
+@media (max-width: 768px) {
+  header {
+    display: grid !important;
+    grid-template-areas:
+      "hamburger logo left-actions"
+      "group-selector group-selector left-profile"
+      "right-profile right-profile right-profile" !important;
+    grid-template-columns: 1fr auto 1fr !important;
+    align-items: center;
+    gap: 12px 8px !important;
+    padding: 14px 16px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  
+  .hamburger-btn {
+    grid-area: hamburger !important;
+    justify-self: start !important; /* aligns to the right under RTL */
+    margin: 0 !important;
+  }
+  
+  .header-logo {
+    grid-area: logo !important;
+    justify-self: center !important;
+    margin: 0 !important;
+  }
+  
+  .family-selector-container {
+    grid-area: group-selector !important;
+    justify-self: start !important; /* aligns to the right under RTL */
+    width: auto !important;
+    justify-content: flex-start !important;
+    margin-top: 0 !important;
+  }
+  
+  #header-inbox-btn {
+    grid-area: left-actions !important;
+    justify-self: end !important; /* aligns to the left under RTL */
+    margin: 0 !important;
+    display: flex !important; /* Make sure envelope is always visible */
+  }
+  
+  #active-profile-card {
+    grid-area: right-profile !important;
+    justify-self: start !important; /* aligns to the right under RTL */
+    margin: 0 !important;
+    margin-top: 4px !important;
+  }
+  
+  .header-settings-btn {
+    grid-area: left-profile !important;
+    justify-self: end !important; /* aligns to the left under RTL */
+    margin: 0 !important;
+  }
+}
+
+/* Hide Hamburger menu button when the user switcher overlay or welcome overlay is active */
+#user-picker-overlay.active ~ * #hamburger-menu-btn,
+#welcome-overlay.active ~ * #hamburger-menu-btn,
+#user-picker-overlay.active ~ #hamburger-menu-btn,
+#welcome-overlay.active ~ #hamburger-menu-btn,
+body:has(#user-picker-overlay.active) #hamburger-menu-btn,
+body:has(#welcome-overlay.active) #hamburger-menu-btn {
+  display: none !important;
+}
+
+/* User Card Context Menu (3-dots dropdown) */
+.user-context-dropdown {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 100;
+  min-width: 150px;
+  background: rgba(26, 15, 48, 0.98); /* dark mode default */
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 6px 0;
+  direction: rtl;
+  text-align: right;
+}
+
+body.mode-light .user-context-dropdown {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+}
+
+.user-context-dropdown .dropdown-item {
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  text-align: right;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  transition: var(--transition-smooth);
+}
+
+.user-context-dropdown .dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+body.mode-light .user-context-dropdown .dropdown-item {
+  color: #0f172a !important;
+}
+
+body.mode-light .user-context-dropdown .dropdown-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+body.mode-light .user-context-dropdown .dropdown-item.btn-delete-profile {
+  color: #ef4444 !important;
 }
